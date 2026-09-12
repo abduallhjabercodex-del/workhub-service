@@ -27,7 +27,7 @@ curl -i http://127.0.0.1:8080/health
 # 2.1 إنشاء مشروع جديد (POST Project)
 curl -i -X POST http://127.0.0.1:8080/api/v1/projects \
   -H "Content-Type: application/json" \
-  -d '{"name": "مشروع WorkHub التجريبي"}'
+  -d '{"name": "WorkHub Demo Project"}'
 
 # 2.2 عرض المشاريع مع الترتيب والبحث والتصفح (GET Projects)
 curl -i "http://127.0.0.1:8080/api/v1/projects?q=WorkHub&sort=name&page=1&limit=10"
@@ -35,7 +35,7 @@ curl -i "http://127.0.0.1:8080/api/v1/projects?q=WorkHub&sort=name&page=1&limit=
 # 2.3 إنشاء مهمة جديدة لمشروع معين (POST Task)
 curl -i -X POST http://127.0.0.1:8080/api/v1/projects/1/tasks \
   -H "Content-Type: application/json" \
-  -d '{"title": "تصميم قاعدة البيانات وتجهيز المعاملات"}'
+  -d '{"title": "Design Database Schema and Setup Transactions"}'
 
 # 2.4 عرض المهام مع الفلترة والصفحات (GET Tasks Filtering & Pagination)
 curl -i "http://127.0.0.1:8080/api/v1/projects/1/tasks?status=todo&sort=title&page=1&limit=10"
