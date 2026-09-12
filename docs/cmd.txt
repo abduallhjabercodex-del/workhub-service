@@ -1,0 +1,181 @@
+===============================================================================
+               WORKHUB API SERVICE — COMMAND HANDBOOK (الأيام 1 - 10)
+===============================================================================
+
+-------------------------------------------------------------------------------
+📌 [اليوم 1: الإعداد وبناء الخدمة وفحص الصحة Day 1 - Request Lifecycle & Health]
+-------------------------------------------------------------------------------
+# 1.1 الانتقال لمجلد المشروع
+cd ~/Desktop/WorkHup/workhub-service
+
+# 1.2 تصدير متغيرات البيئة الأساسية
+export HOST=127.0.0.1
+export PORT=8080
+export REQUEST_TIMEOUT=5s
+
+# 1.3 بناء وتشغيل الخادم التنفيذي
+go build -o bin/server ./cmd/server
+./bin/server
+
+# 1.4 فحص نقطة نهاية فحص الصحة (/health)
+curl -i http://127.0.0.1:8080/health
+
+
+-------------------------------------------------------------------------------
+📌 [اليوم 2: واجهات REST والـ Validation والـ Envelopes Day 2 - REST Contracts]
+-------------------------------------------------------------------------------
+# 2.1 إنشاء مشروع جديد (POST Project)
+curl -i -X POST http://127.0.0.1:8080/api/v1/projects \
+  -H "Content-Type: application/json" \
+  -d '{"name": "مشروع WorkHub التجريبي"}'
+
+# 2.2 عرض المشاريع مع الترتيب والبحث والتصفح (GET Projects)
+curl -i "http://127.0.0.1:8080/api/v1/projects?q=WorkHub&sort=name&page=1&limit=10"
+
+# 2.3 إنشاء مهمة جديدة لمشروع معين (POST Task)
+curl -i -X POST http://127.0.0.1:8080/api/v1/projects/1/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"title": "تصميم قاعدة البيانات وتجهيز المعاملات"}'
+
+# 2.4 عرض المهام مع الفلترة والصفحات (GET Tasks Filtering & Pagination)
+curl -i "http://127.0.0.1:8080/api/v1/projects/1/tasks?status=todo&sort=title&page=1&limit=10"
+
+# 2.5 جلب مهمة واحدة برقم المعرف (GET Single Task)
+curl -i http://127.0.0.1:8080/api/v1/tasks/1
+
+# 2.6 التحديث الجزئي لمهمة (PATCH Task)
+curl -i -X PATCH http://127.0.0.1:8080/api/v1/tasks/1 \
+  -H "Content-Type: application/json" \
+  -d '{"status": "in_progress"}'
+
+# 2.7 حذف مهمة (DELETE Task)
+curl -i -X DELETE http://127.0.0.1:8080/api/v1/tasks/1
+
+# 2.8 إحصائيات المهام التجميعية لكل المشاريع
+curl -i http://127.0.0.1:8080/api/v1/tasks/stats
+
+# 2.9 إحصائيات المهام لمشروع معين
+curl -i http://127.0.0.1:8080/api/v1/projects/1/tasks/stats
+
+# 2.10 محاكاة خطأ التحقق واختبار غلاف الأخطاء الموحد (Validation Error Envelope)
+curl -i -X POST http://127.0.0.1:8080/api/v1/projects \
+  -H "Content-Type: application/json" \
+  -d '{"name": ""}'
+
+
+-------------------------------------------------------------------------------
+📌 [اليوم 3: معمارية الخدمة والـ Middleware والـ Timeouts Day 3 - Architecture]
+-------------------------------------------------------------------------------
+# 3.1 تشغيل الخادم مع منافذ ومهلات زمنية مخصصة
+PORT=9090 REQUEST_TIMEOUT=10s go run ./cmd/server
+
+# 3.2 فحص ترويسة X-Request-ID في السجلات والسيرفر
+curl -i -H "X-Request-ID: demo-req-123" http://127.0.0.1:8080/health
+
+
+-------------------------------------------------------------------------------
+📌 [اليوم 4: هرم الاختبارات وفحص الأداء والسباق Day 4 - Testing & Quality]
+-------------------------------------------------------------------------------
+# 4.1 تشغيل جميع اختبارات المشروع بالتفصيل
+go test -v ./...
+
+# 4.2 تشغيل الاختبارات مع مكتشف سباق البيانات الخفي (Data Race Detector)
+go test -v -race ./...
+
+# 4.3 حساب وتوليد تقرير تغطية الكود (Code Coverage Profile)
+go test ./internal/... -coverprofile=coverage.out
+go tool cover -func=coverage.out
+
+# 4.4 تشغيل قياس أداء الذاكرة والمستودعات (Benchmarks)
+go test -run '^$' -bench BenchmarkListTasks -benchmem ./internal/repository
+
+# 4.5 تنسيق الكود وفحصه بالتحليل الاستاتيكي
+gofmt -w cmd/server internal
+go vet ./...
+
+
+-------------------------------------------------------------------------------
+📌 [اليوم 5: مراجعة الأسبوع الأول والتسليم Day 5 - Weekly Integration 1]
+-------------------------------------------------------------------------------
+# 5.1 فحص حالة Git ووسم الإصدار الأسبوعي الأول v0.1.0
+git status
+git tag -l
+
+
+-------------------------------------------------------------------------------
+📌 [اليوم 6: النمذجة العلاقية وقواعد البيانات Day 6 - Relational Schema & SQL]
+-------------------------------------------------------------------------------
+# 6.1 إنشاء قاعدة بيانات PostgreSQL المحلية
+createdb workhub_dev
+
+# 6.2 تطبيق الهجرة الأولى لتأسيس الجداول (001_init.up.sql)
+psql -d workhub_dev -f db/migrations/001_init.up.sql
+
+# 6.3 إدخال البيانات التجريبية الأولية
+psql -d workhub_dev -f db/seed/001_demo.sql
+
+# 6.4 فحص اختبارات القيود ورفض البيانات الفاسدة (Constraints Script)
+psql -d workhub_dev -f db/tests/constraints.sql
+
+# 6.5 استعراض هيكل الجداول والبيانات عبر psql
+psql -d workhub_dev -c "\dt+"
+psql -d workhub_dev -c "SELECT id, email, full_name FROM users;"
+psql -d workhub_dev -c "SELECT id, name FROM projects;"
+psql -d workhub_dev -c "SELECT id, title, status FROM tasks;"
+
+
+-------------------------------------------------------------------------------
+📌 [اليوم 7: المعاملات الذرية والتراجع الآلي Day 7 - Transactions & Rollbacks]
+-------------------------------------------------------------------------------
+# 7.1 تعيين بيئة قاعدة البيانات الحقيقية
+export DATABASE_URL="postgresql:///workhub_dev?host=/var/run/postgresql&user=abdullah-jaber"
+export DEFAULT_OWNER_ID=1
+
+# 7.2 تشغيل اختبارات معاملات Postgres وإثبات التراجع الذري Rollback
+go test -v ./internal/repository/... -run TestPostgresRepositoryCreateTaskWithAudit
+
+
+-------------------------------------------------------------------------------
+📌 [اليوم 8: الفهارس المركبة وكاش رديس Day 8 - Indexing & Redis Caching]
+-------------------------------------------------------------------------------
+# 8.1 تطبيق هجرة الفهارس المركبة لرفع الأداء (002_query_performance.up.sql)
+psql -d workhub_dev -f db/migrations/002_query_performance.up.sql
+
+# 8.2 تشغيل والتحقق من خدمة Redis
+sudo systemctl start redis-server
+redis-cli ping
+
+# 8.3 تشغيل الخادم مع تفعيل الكاش ورابط رديس
+export REDIS_URL="redis://127.0.0.1:6379/0"
+export REDIS_CACHE_TTL=30s
+go run ./cmd/server
+
+# 8.4 استعلام كاش ملخص المشاريع وإثبات الإبطال (Cache Hit / Miss / Invalidation)
+curl -i http://127.0.0.1:8080/api/v1/projects/1/summary
+
+# 8.5 تشغيل اختبارات الكاش والتعافي عند سقوط رديس (Graceful Fallback)
+go test -v ./internal/cache/... -run TestProjectSummaryCacheHitMissTTLAndInvalidation
+
+
+-------------------------------------------------------------------------------
+📌 [اليوم 9: وسيط الأحداث والعمال الخفية Day 9 - Messaging & Background Workers]
+-------------------------------------------------------------------------------
+# 9.1 تطبيق هجرة Outbox (003_messaging_outbox.up.sql)
+psql -d workhub_dev -f db/migrations/003_messaging_outbox.up.sql
+
+# 9.2 تشغيل اختبارات وسيط الأحداث (Broker Concurrency & Data Race Safety)
+go test -v -race ./internal/messaging/...
+
+# 9.3 تشغيل اختبارات العامل الخفي لمنع الرسائل المكررة (Worker Idempotency)
+go test -v ./internal/worker/...
+
+
+-------------------------------------------------------------------------------
+📌 [اليوم 10: التقييم النهائي والتسليم الأسبوعي Day 10 - Integration Review]
+-------------------------------------------------------------------------------
+# 10.1 تشغيل حزمة الاختبارات الشاملة المزدوجة بالكامل مع مكتشف السباق
+go test -v -race ./...
+
+# 10.2 التحقق من إصدار Git Tag التراكمي النهائي v0.2.0
+git tag -l
+===============================================================================

@@ -1,283 +1,181 @@
+===============================================================================
+               WORKHUB API SERVICE — COMMAND HANDBOOK (الأيام 1 - 10)
+===============================================================================
+
+-------------------------------------------------------------------------------
+📌 [اليوم 1: الإعداد وبناء الخدمة وفحص الصحة Day 1 - Request Lifecycle & Health]
+-------------------------------------------------------------------------------
+# 1.1 الانتقال لمجلد المشروع
 cd ~/Desktop/WorkHup/workhub-service
-export $(cat .env | grep -v '^#' | xargs)
-go run ./cmd/server
 
-
-
- sudo -u postgres createuser -s abdullah-jaber                             
-createdb workhub_dev 
-psql -d workhub_dev -f db/migrations/001_init.up.sql  
- psql -d workhub_dev -f db/migrations/002_query_performance.up.sql   
-psql -d workhub_dev -f db/seed/001_demo.sql 
-
-sudo apt update && sudo apt install -y redis-server 
-sudo systemctl start redis-server 
-redis-cli ping  
-
-
-
-
-1
-curl -i http://127.0.0.1:8080/health
-curl -i http://localhost:8080/health
-go build -o bin/server ./cmd/server
-
-
-
-4
-1. تشغيل جميع الاختبارات
-go test ./... -v
-
-2. تشغيل اختبارات محددة حسب النوع
-
-go test ./internal/service/... -v -run TestCreateProjectValidation
-go test ./internal/service/... -v -run TestTaskStatusValidation
-go test ./internal/service/... -v -run TestMissingProjectAndTask
-
-go test ./internal/config/... -v
-
-3. تشغيل اختبارات الـ Integration (Server + Repo)
-go test ./internal/server/... -v
-
-اختبارات الادا  
-go test ./internal/repository/... -v -run BenchmarkListTasks
-الوصف: تقيس أداء استعلامات قاعدة البيانات في الذاكرة
-go test -run '^$' -bench BenchmarkListTasks -benchmem ./internal/repository
-
-
-اختبارات التكامل (Integration Tests)
-go test ./internal/handler/... -v
-go test ./internal/middleware/... -v
-go test ./internal/cache/... -v
-
-اختبارات قاعدة البيانات (Database Tests)
-psql -d workhub_dev -U abdullah-jaber -h /var/run/postgresql -f db/migrations/constraints.sql
-
-sudo -u postgres psql -d workhub_dev -f db/migrations/constraints.sql
-
-
-
-go test -race ./...
-
-
-
-2. تشغيل جميع الاختبارات مع قاعدة البيانات الحقيقية
-# تعيين متغيرات البيئة
-export DATABASE_URL="postgresql:///workhub_dev?host=/var/run/postgresql&user=abdullah-jaber"
-export DEFAULT_OWNER_ID=1
-export REDIS_URL="redis://127.0.0.1:6379/0"
-export REDIS_CACHE_TTL=30s
+# 1.2 تصدير متغيرات البيئة الأساسية
 export HOST=127.0.0.1
 export PORT=8080
 export REQUEST_TIMEOUT=5s
 
-# تشغيل جميع الاختبارات
-go test ./... -v
+# 1.3 بناء وتشغيل الخادم التنفيذي
+go build -o bin/server ./cmd/server
+./bin/server
 
+# 1.4 فحص نقطة نهاية فحص الصحة (/health)
+curl -i http://127.0.0.1:8080/health
 
 
-gofmt -w cmd/server internal
-    go vet ./...   // go vet ./... هو أمر في Go لفحص الكود بحثًا عن أخطاء ومشاكل محتملة قبل تشغيل الاختبارات أو البناء.
-go test ./...
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-3. تشغيل الاختبارات مع تغطية الكود
-
-go test ./... -coverprofile=coverage.out
-go tool cover -html=coverage.out
-
-go test -coverprofile=coverage.out ./...
-
-
-5. تشغيل اختبارات Redis المحاكاة
-
-go test ./internal/cache/... -v -run TestProjectSummaryCacheHitMissTTLAndInvalidation
-
-
-6. تشغيل اختبارات محددة مع -run
-# اختبار إنشاء المشروع
-go test ./... -v -run TestProjectAndTaskFlow
-
-# اختبار صحة المدخلات
-go test ./... -v -run TestValidationErrorEnvelope
-
-# اختبارات الـ Middleware
-go test ./... -v -run TestRequestIDIsGeneratedAndReturned
-go test ./... -v -run TestRecoveryReturnsServerError
-go test ./... -v -run TestTimeoutMiddleware
-
-# اختبارات التخزين المؤقت
-go test ./... -v -run TestProjectSummaryCacheHitMissTTLAndInvalidation
-
-
-
-psql -d workhub_dev -f db/migrations/003_messaging_outbox.up.sql
-curl -i -X POST http://localhost:8080/api/v1/projects/4/tasks \
-  -H "Content-Type: application/json" \
-  -d '{"title": "تجربة إرسال رسالة للوسيط والعامل"}'
-
-
-
-
-
-
-
-
-
-
-
-# عرض جميع الجداول
-psql -d workhub_dev -U abdullah-jaber -h /var/run/postgresql -c "\dt"
-
-# عرض الجداول مع التفاصيل
-psql -d workhub_dev -U abdullah-jaber -h /var/run/postgresql -c "\dt+"
-
-# عرض جميع العلاقات (جداول، views، sequences)
-psql -d workhub_dev -U abdullah-jaber -h /var/run/postgresql -c "\d"
-
-
-# عرض هيكل جدول users
-psql -d workhub_dev -U abdullah-jaber -h /var/run/postgresql -c "\d users"
-
-# عرض هيكل جدول projects
-psql -d workhub_dev -U abdullah-jaber -h /var/run/postgresql -c "\d projects"
-
-# عرض هيكل جدول tasks
-psql -d workhub_dev -U abdullah-jaber -h /var/run/postgresql -c "\d tasks"
-
-# عرض هيكل جدول memberships
-psql -d workhub_dev -U abdullah-jaber -h /var/run/postgresql -c "\d memberships"
-
-# عرض هيكل جدول task_tags
-psql -d workhub_dev -U abdullah-jaber -h /var/run/postgresql -c "\d task_tags"
-
-
-
-# عرض جميع المستخدمين
-psql -d workhub_dev -U abdullah-jaber -h /var/run/postgresql -c "SELECT * FROM users;"
-
-# عرض جميع المشاريع
-psql -d workhub_dev -U abdullah-jaber -h /var/run/postgresql -c "SELECT * FROM projects;"
-
-# عرض جميع المهام
-psql -d workhub_dev -U abdullah-jaber -h /var/run/postgresql -c "SELECT * FROM tasks;"
-
-# عرض جميع العضويات
-psql -d workhub_dev -U abdullah-jaber -h /var/run/postgresql -c "SELECT * FROM memberships;"
-
-# عرض جميع العلامات
-psql -d workhub_dev -U abdullah-jaber -h /var/run/postgresql -c "SELECT * FROM tags;"
-
-# عرض علاقات المهام بالعلامات
-psql -d workhub_dev -U abdullah-jaber -h /var/run/postgresql -c "SELECT * FROM task_tags;"
-
-
-# إنشاء مشروع
+-------------------------------------------------------------------------------
+📌 [اليوم 2: واجهات REST والـ Validation والـ Envelopes Day 2 - REST Contracts]
+-------------------------------------------------------------------------------
+# 2.1 إنشاء مشروع جديد (POST Project)
 curl -i -X POST http://127.0.0.1:8080/api/v1/projects \
   -H "Content-Type: application/json" \
-  -d '{"name": "مشروع WorkHub"}'
+  -d '{"name": "مشروع WorkHub التجريبي"}'
 
-# عرض كل المشاريع
-curl -i http://127.0.0.1:8080/api/v1/projects
+# 2.2 عرض المشاريع مع الترتيب والبحث والتصفح (GET Projects)
+curl -i "http://127.0.0.1:8080/api/v1/projects?q=WorkHub&sort=name&page=1&limit=10"
 
-# بحث
-curl -i "http://127.0.0.1:8080/api/v1/projects?q=WorkHub"
-
-# ترتيب
-curl -i "http://127.0.0.1:8080/api/v1/projects?sort=name"
-
-export PROJECT_ID='1'
-
-
-# ملخص مشروع (todo / in_progress / done count)
-curl -i http://127.0.0.1:8080/api/v1/projects/{PROJECT_ID}/summary
-
-
-
-
-
-
-# إنشاء مهمة
-curl -i -X POST http://127.0.0.1:8080/api/v1/projects/{PROJECT_ID}/tasks \
+# 2.3 إنشاء مهمة جديدة لمشروع معين (POST Task)
+curl -i -X POST http://127.0.0.1:8080/api/v1/projects/1/tasks \
   -H "Content-Type: application/json" \
-  -d '{"title": "تصميم قاعدة البيانات"}'
+  -d '{"title": "تصميم قاعدة البيانات وتجهيز المعاملات"}'
 
-# عرض كل المهام
-curl -i http://127.0.0.1:8080/api/v1/projects/{PROJECT_ID}/tasks
+# 2.4 عرض المهام مع الفلترة والصفحات (GET Tasks Filtering & Pagination)
+curl -i "http://127.0.0.1:8080/api/v1/projects/1/tasks?status=todo&sort=title&page=1&limit=10"
 
-# فلترة بالحالة
-curl -i "http://127.0.0.1:8080/api/v1/projects/{PROJECT_ID}/tasks?status=todo"
-curl -i "http://127.0.0.1:8080/api/v1/projects/{PROJECT_ID}/tasks?status=in_progress"
-curl -i "http://127.0.0.1:8080/api/v1/projects/{PROJECT_ID}/tasks?status=done"
+# 2.5 جلب مهمة واحدة برقم المعرف (GET Single Task)
+curl -i http://127.0.0.1:8080/api/v1/tasks/1
 
-# بحث + ترتيب + صفحات
-curl -i "http://127.0.0.1:8080/api/v1/projects/{PROJECT_ID}/tasks?status=todo&sort=title&page=1&limit=10"
-
-# جلب مهمة واحدة بالـ ID
-curl -i http://127.0.0.1:8080/api/v1/tasks/{TASK_ID}
-
-
-
-# تغيير الحالة
-curl -i -X PATCH http://127.0.0.1:8080/api/v1/tasks/{TASK_ID} \
+# 2.6 التحديث الجزئي لمهمة (PATCH Task)
+curl -i -X PATCH http://127.0.0.1:8080/api/v1/tasks/1 \
   -H "Content-Type: application/json" \
   -d '{"status": "in_progress"}'
 
-curl -i -X PATCH http://127.0.0.1:8080/api/v1/tasks/{TASK_ID} \
-  -H "Content-Type: application/json" \
-  -d '{"status": "done"}'
+# 2.7 حذف مهمة (DELETE Task)
+curl -i -X DELETE http://127.0.0.1:8080/api/v1/tasks/1
 
-# تغيير العنوان + الحالة معاً
-curl -i -X PATCH http://127.0.0.1:8080/api/v1/tasks/{TASK_ID} \
-  -H "Content-Type: application/json" \
-  -d '{"title": "عنوان جديد", "status": "done"}'
-
-
-
-# تغيير العنوان فقط
-curl -i -X PATCH http://127.0.0.1:8080/api/v1/tasks/{TASK_ID} \
-  -H "Content-Type: application/json" \
-  -d '{"title": "عنوان جديد فقط"}'
-
-# حذف مهمة
-curl -i -X DELETE http://127.0.0.1:8080/api/v1/tasks/{TASK_ID}
-
-
-
-
-
-# إحصائيات المهام حسب الحالة (لكل المشاريع)
+# 2.8 إحصائيات المهام التجميعية لكل المشاريع
 curl -i http://127.0.0.1:8080/api/v1/tasks/stats
 
+# 2.9 إحصائيات المهام لمشروع معين
+curl -i http://127.0.0.1:8080/api/v1/projects/1/tasks/stats
 
-
-# احصائيات المهام حسب الحالات  لمشروع معين
-curl -i "http://127.0.0.1:8080/api/v1/projects/{PROJECT_ID}/tasks/stats"
-
-
-13. محاكاة خطأ التحقق
+# 2.10 محاكاة خطأ التحقق واختبار غلاف الأخطاء الموحد (Validation Error Envelope)
 curl -i -X POST http://127.0.0.1:8080/api/v1/projects \
-  -H 'Content-Type: application/json' \
-  -d '{"name":""}'
+  -H "Content-Type: application/json" \
+  -d '{"name": ""}'
+
+
+-------------------------------------------------------------------------------
+📌 [اليوم 3: معمارية الخدمة والـ Middleware والـ Timeouts Day 3 - Architecture]
+-------------------------------------------------------------------------------
+# 3.1 تشغيل الخادم مع منافذ ومهلات زمنية مخصصة
 PORT=9090 REQUEST_TIMEOUT=10s go run ./cmd/server
+
+# 3.2 فحص ترويسة X-Request-ID في السجلات والسيرفر
+curl -i -H "X-Request-ID: demo-req-123" http://127.0.0.1:8080/health
+
+
+-------------------------------------------------------------------------------
+📌 [اليوم 4: هرم الاختبارات وفحص الأداء والسباق Day 4 - Testing & Quality]
+-------------------------------------------------------------------------------
+# 4.1 تشغيل جميع اختبارات المشروع بالتفصيل
+go test -v ./...
+
+# 4.2 تشغيل الاختبارات مع مكتشف سباق البيانات الخفي (Data Race Detector)
+go test -v -race ./...
+
+# 4.3 حساب وتوليد تقرير تغطية الكود (Code Coverage Profile)
+go test ./internal/... -coverprofile=coverage.out
+go tool cover -func=coverage.out
+
+# 4.4 تشغيل قياس أداء الذاكرة والمستودعات (Benchmarks)
+go test -run '^$' -bench BenchmarkListTasks -benchmem ./internal/repository
+
+# 4.5 تنسيق الكود وفحصه بالتحليل الاستاتيكي
+gofmt -w cmd/server internal
+go vet ./...
+
+
+-------------------------------------------------------------------------------
+📌 [اليوم 5: مراجعة الأسبوع الأول والتسليم Day 5 - Weekly Integration 1]
+-------------------------------------------------------------------------------
+# 5.1 فحص حالة Git ووسم الإصدار الأسبوعي الأول v0.1.0
+git status
+git tag -l
+
+
+-------------------------------------------------------------------------------
+📌 [اليوم 6: النمذجة العلاقية وقواعد البيانات Day 6 - Relational Schema & SQL]
+-------------------------------------------------------------------------------
+# 6.1 إنشاء قاعدة بيانات PostgreSQL المحلية
+createdb workhub_dev
+
+# 6.2 تطبيق الهجرة الأولى لتأسيس الجداول (001_init.up.sql)
+psql -d workhub_dev -f db/migrations/001_init.up.sql
+
+# 6.3 إدخال البيانات التجريبية الأولية
+psql -d workhub_dev -f db/seed/001_demo.sql
+
+# 6.4 فحص اختبارات القيود ورفض البيانات الفاسدة (Constraints Script)
+psql -d workhub_dev -f db/tests/constraints.sql
+
+# 6.5 استعراض هيكل الجداول والبيانات عبر psql
+psql -d workhub_dev -c "\dt+"
+psql -d workhub_dev -c "SELECT id, email, full_name FROM users;"
+psql -d workhub_dev -c "SELECT id, name FROM projects;"
+psql -d workhub_dev -c "SELECT id, title, status FROM tasks;"
+
+
+-------------------------------------------------------------------------------
+📌 [اليوم 7: المعاملات الذرية والتراجع الآلي Day 7 - Transactions & Rollbacks]
+-------------------------------------------------------------------------------
+# 7.1 تعيين بيئة قاعدة البيانات الحقيقية
+export DATABASE_URL="postgresql:///workhub_dev?host=/var/run/postgresql&user=abdullah-jaber"
+export DEFAULT_OWNER_ID=1
+
+# 7.2 تشغيل اختبارات معاملات Postgres وإثبات التراجع الذري Rollback
+go test -v ./internal/repository/... -run TestPostgresRepositoryCreateTaskWithAudit
+
+
+-------------------------------------------------------------------------------
+📌 [اليوم 8: الفهارس المركبة وكاش رديس Day 8 - Indexing & Redis Caching]
+-------------------------------------------------------------------------------
+# 8.1 تطبيق هجرة الفهارس المركبة لرفع الأداء (002_query_performance.up.sql)
+psql -d workhub_dev -f db/migrations/002_query_performance.up.sql
+
+# 8.2 تشغيل والتحقق من خدمة Redis
+sudo systemctl start redis-server
+redis-cli ping
+
+# 8.3 تشغيل الخادم مع تفعيل الكاش ورابط رديس
+export REDIS_URL="redis://127.0.0.1:6379/0"
+export REDIS_CACHE_TTL=30s
+go run ./cmd/server
+
+# 8.4 استعلام كاش ملخص المشاريع وإثبات الإبطال (Cache Hit / Miss / Invalidation)
+curl -i http://127.0.0.1:8080/api/v1/projects/1/summary
+
+# 8.5 تشغيل اختبارات الكاش والتعافي عند سقوط رديس (Graceful Fallback)
+go test -v ./internal/cache/... -run TestProjectSummaryCacheHitMissTTLAndInvalidation
+
+
+-------------------------------------------------------------------------------
+📌 [اليوم 9: وسيط الأحداث والعمال الخفية Day 9 - Messaging & Background Workers]
+-------------------------------------------------------------------------------
+# 9.1 تطبيق هجرة Outbox (003_messaging_outbox.up.sql)
+psql -d workhub_dev -f db/migrations/003_messaging_outbox.up.sql
+
+# 9.2 تشغيل اختبارات وسيط الأحداث (Broker Concurrency & Data Race Safety)
+go test -v -race ./internal/messaging/...
+
+# 9.3 تشغيل اختبارات العامل الخفي لمنع الرسائل المكررة (Worker Idempotency)
+go test -v ./internal/worker/...
+
+
+-------------------------------------------------------------------------------
+📌 [اليوم 10: التقييم النهائي والتسليم الأسبوعي Day 10 - Integration Review]
+-------------------------------------------------------------------------------
+# 10.1 تشغيل حزمة الاختبارات الشاملة المزدوجة بالكامل مع مكتشف السباق
+go test -v -race ./...
+
+# 10.2 التحقق من إصدار Git Tag التراكمي النهائي v0.2.0
+git tag -l
+===============================================================================
