@@ -1,59 +1,112 @@
-# Clinic 2 — Real-time delivery في WorkHub
+# Clinic 2 — Real-time Event Delivery & Architectural Patterns
+**Document Type**: Technical Design Document, Event Delivery Patterns & Architectural Tradeoffs  
+**Author**: Abdullah Jaber  
+**Project**: WorkHub API Microservice (`workhub-service`)  
 
-## السيناريو
+---
 
-عندما يغيّر عضو حالة مهمة أو يضيف تعليقًا، يريد باقي أعضاء المشروع رؤية التغيير دون تحديث الصفحة يدويًا. نحتاج لذلك قناة تسليم أحداث، مع تحديد اتجاه الاتصال، آلية إعادة الاتصال، heartbeat، fan-out، الحدود، والضغط الخلفي.
+## 1. Executive Overview
 
-## مقارنة الأنماط
+تهدف هذه الوثيقة المعمارية إلى التحليل الفني الشامل وتصميم آلية التوصيل اللحظي للأحداث (Real-time Event Delivery) في منصة WorkHub. تتناول الوثيقة مقارنة تفصيلية بين الأنماط المتاحة: **Short Polling**, **Long Polling**, **Server-Sent Events (SSE)**, **WebSockets**, و **gRPC Streaming**، مع وضع الحلول المعمارية لدورة حياة الاتصال، نبضات الإبقاء (Heartbeats)، التوزيع غير الحاط (Fan-out)، الضغط العكسي (Backpressure)، وإعادة الاتصال باستخدام `Last-Event-ID`.
 
-| النمط | اتجاه الاتصال | زمن الاستجابة | مناسب لـWorkHub عندما |
-|---|---|---:|---|
-| Polling | العميل يطلب دوريًا | مرتبط بالفاصل الزمني | الحل الأبسط، أو عندما لا توجد حاجة فورية. |
-| Long polling | العميل يرسل طلبًا يبقى مفتوحًا حتى حدث/timeout | جيد مع أحداث قليلة | نحتاج توافق HTTP واسعًا دون قناة دائمة متخصصة. |
-| SSE | الخادم إلى العميل عبر `text/event-stream` | منخفض | تحديث لوحات المشاريع والإشعارات باتجاه واحد. |
-| WebSocket | ثنائي الاتجاه عبر اتصال واحد | منخفض جدًا | الدردشة، الحضور، أو تعاون يحتاج رسائل من الطرفين. |
-| Streaming response | الخادم يرسل أجزاء من استجابة HTTP | منخفض أثناء الطلب | تقارير أو نتائج تدريجية، وليس بالضرورة قناة أحداث دائمة. |
+---
 
-تعرّف مواصفة WHATWG واجهة `EventSource` لاستقبال أحداث يدفعها الخادم عبر HTTP، مع MIME type هو `text/event-stream` وإمكانية إعادة الاتصال عند انقطاع القناة [2]. أما WebSocket فيوفر اتصالًا ثنائي الاتجاه يبدأ بـopening handshake ثم message framing فوق TCP [3].
+## 2. Real-time Patterns Comparison Matrix (جدول التحليل المقارن)
 
-## الاختيار المقترح
+| وجه المقارنة | Short Polling | Long Polling | Server-Sent Events (SSE) | WebSockets | gRPC Server Streaming |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **اتجاه الاتصال** | العميل يطلب تكراراً | العميل يطلب وينتظر | اتجاه واحد (Server-to-Client) | ثنائي الاتجاه (Bi-directional) | اتجاه واحد أو ثنائي |
+| **البروتوكول المستعمل** | HTTP/1.1 or HTTP/2 | HTTP/1.1 or HTTP/2 | HTTP/1.1 or HTTP/2 | WebSocket Protocol (ws/wss) | HTTP/2 (gRPC Protobuf) |
+| **زمن الاستجابة (Latency)** | مرتفع (مرتبط بالفاصل الزمني) | متوسط (يعتمد على الـ Timeout) | منخفض جداً (دفع لحظي) | منخفض جداً (دفع لحظي في الاتجاهين) | منخفض جداً (دفع لحظي هيكلي) |
+| **استهلاك الموارد (Overhead)** | مرتفع جداً على الشبكة والسيرفر | مرتفع في فتح وإغلاق الطلبات | منخفض (اتصال persistent واحد) | منخفض جداً بعد مصافحة الترقية | منخفض جداً (تسلسل ثنائي) |
+| **إعادة الاتصال التلقائي** | يدوي عبر كود العميل | يدوي عبر كود العميل | مدعوم ذاتياً في المتصفح (`EventSource`) | يستلزم كود إعادة اتصال مخصص | يستلزم كود إعادة اتصال مخصص |
+| **دعم الاستئناف (Resume)** | غير مدعوم | غير مدعوم | ممتاز عبر ترويسة `Last-Event-ID` | يستلزم بناء نظام Sequence ID | يستلزم بناء نظام Sequence ID |
+| **الملاءمة لـ WorkHub** | غير آمن للتوسع | استهلاك مفرط للموارد | **الخيار الأمثل للإشعارات واللوحات** | ممتاز للدردشة والتفاعل المباشر | مناسب للميكروسيرفسز الداخلية |
 
-نبدأ في WorkHub باستخدام **SSE** لتحديث لوحة المشروع؛ لأن أغلب التدفق في هذه الحالة من الخادم إلى المتصفح. أما أوامر التغيير فتستمر عبر REST. ننتقل إلى WebSocket فقط إذا احتجنا تفاعلًا ثنائي الاتجاه مستمرًا مثل chat أو presence.
+---
 
-## دورة حياة اتصال SSE
+## 3. Real-world Use Cases & Tradeoffs (حالات الاستخدام والموازنات الهندسية)
+
+### 🔹 حالة الاستخدام 1: تحديثات لوحات المشاريع وإشعارات المهام (Project Dashboard Updates)
+- **الخيار المعماري المقترح**: **Server-Sent Events (SSE)**.
+- **المبررات والتوازنات (Tradeoffs)**:
+  - **المكاسب**:
+    1. جميع التعديلات في WorkHub (تغيير حالة المهمة، إضافة تعليق) يتم إرسالها من الخادم إلى العميل فقط.
+    2. يعمل فوق HTTP القياسي بدون الحاجة لترقية البروتوكول (Protocol Upgrade) أو فتح موانع نارية جديدة.
+    3. المتصفح يتكفل تلقائياً بإعادة الاتصال وإرسال `Last-Event-ID` لاستعادة الأحداث الفائتة.
+  - **التحدي المتبادل**: يقتصر على نقل البيانات باتجاه واحد، ولا يصلح لتطبيقات التحرير المشترك اللحظي المعقد.
+
+### 🔹 حالة الاستخدام 2: المحادثات اللحظية ومؤشرات الحضور (Live Chat & User Presence)
+- **الخيار المعماري المقترح**: **WebSockets**.
+- **المبررات والتوازنات (Tradeoffs)**:
+  - **المكاسب**: يوفر قنوات اتصالات مزدوجة كاملة (Full-Duplex) تعطي أداءً فائقاً في المحادثات الصوتية/النصية ومؤشرات الكتابة المباشرة ("يكتب الآن...").
+  - **التحدي المتبادل**: صعوبة في إدارة الموازنات التشغيلية خلف الوكلاء (Load Balancers)، ويتطلب بناء آليات مخصصة لإدارة الـ Heartbeats والـ Reconnection.
+
+### 🔹 حالة الاستخدام 3: تصدير التقارير الضخمة والبيانات التدريجية (Bulk Report Streaming)
+- **الخيار المعماري المقترح**: **HTTP Chunked Transfer / gRPC Streaming**.
+- **المبررات والتوازنات (Tradeoffs)**:
+  - **المكاسب**: تدفق أجزاء البيانات فور توليدها دون الحاجة لتجميع التقرير كاملاً في الذاكرة العشوائية للخادم.
+  - **التحدي المتبادل**: يرتبط بعمر طلب HTTP واحد ولا يمثل قناة أحداث دائمية مفتوحة.
+
+---
+
+## 4. WorkHub Real-time Delivery Architecture (بنية التوصيل اللحظي في WorkHub)
 
 ```text
-Client EventSource
-      │ GET /api/v1/projects/{id}/events
-      ▼
-Authenticate + authorize project membership
-      │
-      ▼
-Register subscriber ── heartbeat every 15–30s
-      │
-      ├── task.updated event
-      ├── comment.created event
-      └── reconnect using Last-Event-ID
-      │
-      ▼
-Disconnect / timeout / client close → unregister subscriber
+[ REST API Mutation ] ──> [ WorkHub Domain Service ] ──> [ In-Memory / Redis PubSub Broker ]
+                                                                     │
+                                                                     ▼
+[ Client EventSource ] <── [ SSE Handler (text/event-stream) ] <── [ Subscriber Channel ]
 ```
 
-المتصفح يعيد الاتصال عادة عند إغلاق الاتصال، ويمكن للخادم إيقاف إعادة الاتصال باستجابة `204 No Content` وفق مواصفة Server-Sent Events [2]. لذلك يجب أن تكون الأحداث قابلة لإعادة القراءة أو أن يحتفظ الخادم بآخر events لفترة قصيرة.
+### 💓 1. إدارة دورة الحياة ونبضات الإبقاء (Lifecycle & Heartbeats)
+- يتم التحقق من مصادقة المستخدم وعضويته في المشروع قبل فتح قناة الـ SSE.
+- يرسل الخادم رسالة نبضية (Heartbeat Ping `: ping\n\n`) كل 15 ثانية لمنع المحولات والمصفيات الشبكية من إغلاق الاتصال بسبب الخمول (Idle Connection Timeout).
 
-## fan-out والحدود
+### 📢 2. التوزيع المحدد وتفادي الضغط العكسي (Fan-out & Bounded Backpressure)
+- **التوزيع (Fan-out)**: يتم تصفية وتوجيه أحداث المشروع فقط للمستخدمين المكونين كأعضاء مقيدين في هذا المشروع (`project_id`).
+- **الضغط العكسي (Backpressure)**: يتم تخصيص Bounded Buffer برقم محدد لكل مستمع (مثلاً 32 حدث). إذا كان المتلقي بطيئاً جداً وامتلأ الـ Buffer، يتم إسقاط الأحداث غير الحرجة أو إغلاق القناة لإجبار العميل على إعادة الاتصال واستجماع البيانات المحدثة عبر REST snapshot.
 
-يُنشئ الخادم اشتراكًا لكل مستخدم أو اتصال، ثم يرسل الحدث فقط إلى المشتركين المصرح لهم برؤية المشروع. يجب وضع حدود مثل عدد الاتصالات لكل مستخدم، وعدد الاتصالات لكل instance، وحجم event، ومدة الاتصال، وحجم buffer لكل subscriber.
+---
 
-## backpressure
+## 5. Formal Architectural Diagram (المخطط المعماري الرسمي)
 
-إذا كان العميل أبطأ من معدل الأحداث، لا ينبغي أن ينمو buffer بلا حدود. السياسة المقترحة هي: buffer صغير لكل اتصال، إسقاط الأحداث القابلة لإعادة البناء، إرسال heartbeat، ثم إغلاق الاتصال برسالة قابلة للتشخيص إذا تجاوز العميل الحد. عند إعادة الاتصال يعيد العميل جلب snapshot من REST ثم يستكمل الأحداث الجديدة.
+Below is the complete lifecycle architecture diagram for WorkHub Real-time Event Delivery:
 
-## قرار التنفيذ المرحلي
+```mermaid
+sequenceDiagram
+    autonumber
+    participant UserA as 👤 User A (Rest Action)
+    participant REST as 🚀 WorkHub REST API
+    participant Broker as 📡 Messaging Broker
+    participant SSE as ⚡ SSE Event Stream Handler
+    participant UserB as 👤 User B (Listening Client)
 
-النسخة الحالية من WorkHub تنفذ REST فقط. هذه الوثيقة تضع التصميم قبل إضافة قناة الأحداث، حتى لا نخلط بين mutation API وقناة التحديث. التنفيذ المستقبلي يمكن أن يضيف `internal/realtime` مستقلًا مع broker داخلي، ثم Redis أو NATS عند التوسع إلى عدة instances.
+    Note over UserB,SSE: Step 1: Open SSE Connection
+    UserB->>SSE: 1. GET /api/v1/projects/42/events (Header: Accept: text/event-stream)
+    Note over SSE: Authenticate Auth Token & Check Project Membership
+    SSE-->>UserB: 2. 200 OK (Content-Type: text/event-stream, Keep-Alive)
+    
+    loop Heartbeat Loop (Every 15s)
+        SSE-->>UserB: 3. : ping (Keep Connection Alive)
+    end
 
-## المراجع
+    Note over UserA,REST: Step 2: Event Mutation Trigger
+    UserA->>REST: 4. PATCH /api/v1/tasks/100 (Status: "done")
+    REST->>REST: 5. Update Task in DB & Commit Transaction
+    REST->>Broker: 6. Publish Event ("task.updated", TaskID: 100)
 
-[2]: https://html.spec.whatwg.org/multipage/server-sent-events.html "WHATWG HTML — Server-sent events"
-[3]: https://www.rfc-editor.org/rfc/rfc6455 "RFC 6455 — The WebSocket Protocol"
+    Note over Broker,SSE: Step 3: Event Fan-out & Real-time Push
+    Broker->>SSE: 7. Dispatch Event to Active Project Subscribers
+    SSE-->>UserB: 8. event: task.updated \n data: {"task_id":"100", "status":"done"}
+
+    Note over UserB,SSE: Step 4: Reconnection with Last-Event-ID (If Network Drops)
+    UserB->>SSE: 9. Re-connect GET /api/v1/projects/42/events (Header: Last-Event-ID: 8)
+    SSE-->>UserB: 10. Re-sync Missed Events & Resume Stream
+```
+
+---
+
+## 6. Implementation Strategy Decision (القرار التنفيذي)
+
+تعتمد البنية المستقبلية لمنصة WorkHub نمط **SSE (Server-Sent Events)** لتحديثات اللوحات والإشعارات، مع إبقاء واجهات الـ REST لمعالجة التعديلات (Mutations). هذا الفصل المعماري يضمن أعلى أداء، خلو الاتصالات من التعقيد التشغيلي، وسهولة التوسع المستقبلي باستخدام Redis Pub/Sub بين خوادم التطبيق متعددة النسخ.

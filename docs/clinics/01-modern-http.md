@@ -1,53 +1,111 @@
-# Clinic 1 — Modern HTTP في WorkHub
+# Clinic 1 — Modern HTTP Protocols & Service Boundaries
+**Document Type**: Technical Design Document, Protocol Comparison & Architectural Tradeoffs  
+**Author**: Abdullah Jaber  
+**Project**: WorkHub API Microservice (`workhub-service`)  
 
-## الهدف
+---
 
-تشرح هذه الوثيقة كيف يختار WorkHub إصدار HTTP المناسب، وكيف تتعامل البنية مع TLS termination وkeep-alive والضغط ورؤوس الوكيل وإعادة استخدام الاتصال.
+## 1. Executive Overview
 
-## مقارنة الإصدارات
+تهدف هذه الوثيقة المعمارية إلى تحليل وتحديد بروتوكول HTTP الأنسب للعمليات داخل منصة WorkHub. تتناول الوثيقة مقارنة تفصيلية بين بروتوكولات **HTTP/1.1** و **HTTP/2** و **HTTP/3 (QUIC)**، مع وضع معايير تصميمية دقيقة لإنهاء التشفير (TLS Termination)، إدارة اتصالات البقاء (Keep-Alive)، ضغط البيانات (Compression)، حماية رؤوس الوكيل (Proxy Headers)، وإعادة استخدام الاتصالات الشبكية.
 
-| الإصدار | النقل | التعددية | الأثر على WorkHub |
-|---|---|---|---|
-| HTTP/1.1 | TCP، رسائل نصية، غالبًا عدة اتصالات متوازية | محدودة؛ لا توجد طبقة multiplexing أصلية | مناسب للتوافق والبساطة، لكنه قد يحتاج اتصالات متعددة عند كثرة الطلبات. |
-| HTTP/2 | TCP مع framing ثنائي وmultiplexing للطلبات | عدة streams داخل اتصال واحد | يقلل عدد الاتصالات ويحسن تحميل API، لكن فقد حزمة TCP قد يوقف تدفقات نشطة حتى تتم المعالجة. |
-| HTTP/3 | QUIC فوق UDP مع TLS 1.3 مدمج | streams مستقلة مع flow control لكل stream | يقلل أثر فقد حزمة على الطلبات الأخرى، ويحتاج دعم QUIC/UDP في العميل والشبكة. |
+---
 
-يوضح RFC 9114 أن HTTP/3 ينقل semantics الخاصة بـHTTP فوق QUIC، وأن QUIC يوفر multiplexing وflow control لكل stream وإنشاء اتصال بزمن تأخير منخفض [1]. كما يذكر أن HTTP/2 أضاف framing وmultiplexing فوق TCP، لكن فقد الحزمة قد يوقف المعاملات النشطة بسبب اعتماد TCP على ترتيب البايتات [1].
+## 2. Protocol Comparison Matrix (جدول التحليل المقارن)
 
-## TLS termination
+| وجه المقارنة | HTTP/1.1 | HTTP/2 | HTTP/3 (QUIC) |
+| :--- | :--- | :--- | :--- |
+| **بروتوكول النقل (Transport)** | TCP | TCP | UDP (عبر QUIC) |
+| **نسق البيانات (Framing)** | نصي (Plaintext ASCII) | ثنائي (Binary Framing) | ثنائي (Binary Framing) |
+| **تعددية الطلبات (Multiplexing)** | لا يوجد (معين لكل طلب) | ممتاز (Streams فوق TCP) | ممتاز جداً (Streams مستقلة فوق UDP) |
+| **حظر رأس السلسلة (HoL Blocking)** | يقع على مستوى HTTP و TCP | يقع على مستوى TCP فقط عند فقدان الحزم | منعدم كلياً (كل Stream يتصرف بشكل مستقل) |
+| **مصافحة التشفير (TLS Handshake)** | 2-RTT (أو 1-RTT مع TLS 1.3) | 2-RTT (أو 1-RTT مع TLS 1.3) | 1-RTT أو 0-RTT (TLS 1.3 مدمج كلياً) |
+| **ضغط الرؤوس (Header Compression)** | لا يوجد (إرسال الرؤوس كاملة) | HPACK | QPACK (مكافيف لا تعتمد على ترتيب الحزم) |
+| **إعادة الاتصال (Connection Migration)** | يتطلب إعادة إنشاء اتصال جديد | يتطلب إعادة إنشاء اتصال جديد | يدعم تنقل شبكة العميل (Connection ID) بدون انقطاع |
+| **الملاءمة لـ WorkHub** | التوافقية للبنية التحتية الداخلية | كفاءة الطلبات المتعددة لـ REST API | الشبكات اللاسلكية والعملاء من تطبيقات الهاتف |
 
-في إنتاج WorkHub يُفضّل وضع Load Balancer أو Reverse Proxy أمام الخدمة:
+---
+
+## 3. Real-world Use Cases & Tradeoffs (حالات الاستخدام والموازنات الهندسية)
+
+### 🔹 حالة الاستخدام 1: واجهات برمجة التطبيقات العامة (Public REST APIs)
+- **الخيار المعماري**: استخدام **HTTP/2** في الواجهة الأمامية (Edge Gateway / Reverse Proxy).
+- **المبررات والتوازنات (Tradeoffs)**:
+  - **المكاسب**: يستفيد المتصفح وتطبيقات العميل من فتح اتصال TCP واحد وتمرير عشرات الطلبات المتوازية (Multiplexing) للأنشطة والمهام بدون تكلفة مصافحة متكررة (Zero Handshake Latency per request).
+  - **التحدي المتبادل**: في حال وجود فقدان حزم في شبكة TCP، قد تتباطأ جميع التدفقات مؤقتاً (TCP Head-of-Line Blocking).
+
+### 🔹 حالة الاستخدام 2: الاتصال الداخلي بين الخدمات الميكروية (Internal Microservice-to-Service)
+- **الخيار المعماري**: استخدام **HTTP/1.1** مع اتصالات دائمية (Keep-Alive Connection Pooling) أو **gRPC فوق HTTP/2**.
+- **المبررات والتوازنات (Tradeoffs)**:
+  - **المكاسب**: في الشبكات الداخلية الموثوقة (Private Subnets / VPC)، يوفر HTTP/1.1 بساطة عالية واستقراراً تاماً وسهولة في تتبع السجلات والـ Debugging عبر الوكلاء الداخليين.
+  - **التحدي المتبادل**: يحتاج لضبط دقيق لحجم تجمعات الاتصالات (Connection Pool Sizing).
+
+### 🔹 حالة الاستخدام 3: عملاء الشبكات المتنقلة والضعيفة (Mobile / Edge Clients)
+- **الخيار المعماري**: تمكين **HTTP/3 (QUIC)** عند طبقة الـ Edge Gateway.
+- **المبررات والتوازنات (Tradeoffs)**:
+  - **المكاسب**: مرونة فائقة عند تغير شبكة العميل (مثل الانتقال من Wi-Fi إلى 4G/5G) بفضل استخدام `Connection ID` بدلاً من اعتماد الاتصال على عنوان الـ IP والـ Port، مما يمنع انقطاع جلسات التحرير أو التصفح.
+  - **التحدي المتبادل**: يتطلب دعماً حزمياً لبروتوكول UDP في الجدران النارية وبنية التمرير السحابية.
+
+---
+
+## 4. Edge Security & Infrastructure Design (تصميم الأمان والحافة)
 
 ```text
-Client -- HTTPS/TLS --> Reverse Proxy -- HTTP/1.1 أو HTTP/2 --> WorkHub
+[ Client Application ] 
+       │ 
+       │ HTTPS / HTTP/2 / HTTP/3 (QUIC) [TLS 1.3]
+       ▼
+[ Reverse Proxy / Nginx / Envoy ]  <--- TLS Termination, Rate Limiting & Compression (Gzip/Brotli)
+       │ 
+       │ HTTP/1.1 (Keep-Alive Pool over Private Network)
+       ▼
+[ WorkHub Application Service (Go) ]
 ```
 
-الـProxy ينهي TLS، ويتحقق من الشهادة، ثم يمرر الرؤوس الآمنة مثل `X-Forwarded-For` و`X-Forwarded-Proto` مع تقييد مصادرها. يجب ألا يثق WorkHub بهذه الرؤوس من عميل مباشر غير موثوق. ويمكن لاحقًا استخدام TLS داخلي أيضًا إذا كانت الشبكة بين الـProxy والخدمة غير موثوقة.
+### 🔒 1. إنهاء التشفير (TLS Termination)
+- يتم إنهاء شهادة التشفير HTTPS/TLS عند طبقة الـ Reverse Proxy بدلاً من خادم التطبيق مباشرة.
+- **الهدف**: توفير استهلاك الـ CPU في خادم Go وإدارة الشهادات مركزياً (مثل Let's Encrypt / Vault).
 
-## keep-alive وإعادة استخدام الاتصال
+### 🛡️ 2. حماية وتوثيق رؤوس الوكيل (Proxy Headers)
+تطبيق قواعد حازمة لحماية الخدمة من التلاعب بعناوين الـ IP أو البروتوكولات:
+- `X-Request-ID`: معرف عالمي فريد لتتبع الطلب عبر السجلات الهيكلية (`slog`).
+- `X-Forwarded-For`: يتضمن IP العميل الحقيقي، ويتم قبوله وحقنه حتمياً فقط من الوكيل الموثوق (Trusted Proxy).
+- `X-Forwarded-Proto`: يثبت أن الطلب الأصلي ورد عبر بروتوكول مشفر `https`.
 
-يحافظ العميل أو الوكيل على اتصال TCP/QUIC لإرسال عدة طلبات بدل إنشاء اتصال جديد لكل طلب. هذا يقلل تكلفة handshake ويُحسن latency. في WorkHub، يجب ضبط `ReadHeaderTimeout`، وحدود body، ومهلات الطلب حتى لا يتحول keep-alive إلى وسيلة لاستنزاف الموارد.
+### ⏱️ 3. إدارة التوقيت وإعادة الاستخدام (Keep-Alive & Timeouts)
+- ضبط `ReadHeaderTimeout = 5s` في خادم Go لمنع هجمات Slowloris.
+- تفعيل `Cache-Control: no-store` لجميع واجهات التعديل لمنع تخزين البيانات الحساسة في ذاكرة المتصفحات الوسيطة.
 
-## compression
+---
 
-ضغط JSON مناسب للاستجابات الكبيرة مثل قوائم المشاريع والمهام، لكنه يضيف CPU وقد لا يفيد الاستجابات الصغيرة. يُفعّل عادة في الـReverse Proxy عبر `gzip` أو `br`، مع احترام `Accept-Encoding` وعدم ضغط البيانات الحساسة بطريقة تكشف ارتباط الحجم بالمحتوى.
+## 5. Architectural Diagram (المخطط المعماري الرسمي)
 
-## proxy headers وconnection reuse
+Below is the formal architecture diagram for WorkHub Modern HTTP Protocol Handling:
 
-الرؤوس المقترحة للتتبع هي:
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Client as 💻 Client (Browser/Mobile)
+    participant Edge as 🛡️ Reverse Proxy (Nginx/Envoy)
+    participant App as 🚀 WorkHub Service (Go)
+    participant DB as 🗄️ PostgreSQL Database
 
-| الرأس | الوظيفة |
-|---|---|
-| `X-Request-ID` | ربط سجل الطلب بين العميل والـProxy وWorkHub. |
-| `X-Forwarded-For` | عنوان العميل الأصلي، ويُقبل فقط من Proxy موثوق. |
-| `X-Forwarded-Proto` | توضيح أن الطلب الأصلي كان HTTPS. |
-| `Content-Encoding` | بيان الضغط المستخدم للاستجابة. |
-| `Cache-Control` | التحكم في التخزين المؤقت؛ API المتغير في WorkHub يستخدم `no-store` افتراضيًا. |
+    Note over Client,Edge: Public Network (HTTPS / HTTP/2 / HTTP/3 over QUIC)
+    Client->>Edge: 1. TLS 1.3 Handshake & HTTP Request (GET /api/v1/projects)
+    Note over Edge: TLS Termination, Auth Check, Inject Proxy Headers (X-Request-ID)
 
-## قرار WorkHub
+    Note over Edge,App: Internal Private Network (HTTP/1.1 Keep-Alive Pool)
+    Edge->>App: 2. Forward Request + X-Forwarded-For + X-Request-ID
+    App->>App: 3. Verify Context, Middleware Audit & Rate Limit
+    App->>DB: 4. Execute Query (pgxpool)
+    DB-->>App: 5. Query Result Data
+    App-->>Edge: 6. JSON Response Envelope + X-Request-ID Header
+    Note over Edge: Apply Gzip/Brotli Compression (Accept-Encoding)
+    Edge-->>Client: 7. HTTP/2 Frame 200 OK (Compressed Payload)
+```
 
-في المرحلة الحالية يبقى التطبيق Go HTTP/1.1-compatible خلف Proxy، لأن ذلك أبسط للتشغيل والاختبار. يمكن تفعيل HTTP/2 تلقائيًا عند استخدام TLS مناسب، ثم إضافة HTTP/3 على طبقة edge عندما تتوفر بنية QUIC. لا ينبغي أن يغير ذلك عقد `/api/v1` أو منطق الخدمات.
+---
 
-## المراجع
+## 6. WorkHub Implementation Decision (القرار التنفيذي للمشروع)
 
-[1]: https://www.rfc-editor.org/rfc/rfc9114 "RFC 9114 — HTTP/3"
+تمت هيكلة تطبيق `workhub-service` ليكون متوافقاً كلياً مع **HTTP/1.1 و HTTP/2** خلف Reverse Proxy، مما يوفر أداءً ممتازاً وسرعة معالجة عالية مع المحافظة على عقد واجهات الـ REST متسقاً وخالياً من التعقيدات التشغيلية غير الضرورية.

@@ -1,0 +1,19 @@
+sequenceDiagram
+    autonumber
+    participant Client as 💻 Client (Browser/Mobile)
+    participant Edge as 🛡️ Reverse Proxy (Nginx/Envoy)
+    participant App as 🚀 WorkHub Service (Go)
+    participant DB as 🗄️ PostgreSQL Database
+
+    Note over Client,Edge: Public Network (HTTPS / HTTP/2 / HTTP/3 over QUIC)
+    Client->>Edge: 1. TLS 1.3 Handshake & HTTP Request (GET /api/v1/projects)
+    Note over Edge: TLS Termination, Auth Check, Inject Proxy Headers (X-Request-ID)
+
+    Note over Edge,App: Internal Private Network (HTTP/1.1 Keep-Alive Pool)
+    Edge->>App: 2. Forward Request + X-Forwarded-For + X-Request-ID
+    App->>App: 3. Verify Context, Middleware Audit & Rate Limit
+    App->>DB: 4. Execute Query (pgxpool)
+    DB-->>App: 5. Query Result Data
+    App-->>Edge: 6. JSON Response Envelope + X-Request-ID Header
+    Note over Edge: Apply Gzip/Brotli Compression (Accept-Encoding)
+    Edge-->>Client: 7. HTTP/2 Frame 200 OK (Compressed Payload)
