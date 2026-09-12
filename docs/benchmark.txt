@@ -1,0 +1,7 @@
+goos: linux
+goarch: amd64
+pkg: example.com/day1-go-service/internal/repository
+cpu: Intel(R) Xeon(R) Processor @ 2.10GHz
+BenchmarkListTasks-6   	   10000	    106229 ns/op	  303131 B/op	      15 allocs/op
+PASS
+ok  	example.com/day1-go-service/internal/repository	1.081s

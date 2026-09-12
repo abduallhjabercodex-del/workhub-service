@@ -1,0 +1,73 @@
+erDiagram
+    USERS ||--o{ PROJECTS : owns
+    USERS ||--o{ MEMBERSHIPS : has
+    PROJECTS ||--o{ MEMBERSHIPS : includes
+    PROJECTS ||--o{ TASKS : contains
+    USERS ||--o{ TASKS : creates
+    USERS o|--o{ TASKS : assigned
+    PROJECTS ||--o{ TAGS : defines
+    TASKS ||--o{ TASK_TAGS : labeled
+    TAGS ||--o{ TASK_TAGS : applied
+    USERS o|--o{ AUDIT_EVENTS : performs
+    PROJECTS o|--o{ AUDIT_EVENTS : scopes
+    TASKS o|--o{ AUDIT_EVENTS : records
+
+    USERS {
+        bigint id PK
+        text email UK
+        text display_name
+        text password_hash
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+    PROJECTS {
+        bigint id PK
+        bigint owner_user_id FK
+        text name
+        text description
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+    MEMBERSHIPS {
+        bigint project_id PK_FK
+        bigint user_id PK_FK
+        text role
+        timestamptz joined_at
+        timestamptz removed_at
+    }
+    TASKS {
+        bigint id PK
+        bigint project_id FK
+        bigint created_by FK
+        bigint assignee_id FK
+        text title
+        text status
+        smallint priority
+        timestamptz due_at
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
+    }
+    TAGS {
+        bigint id PK
+        bigint project_id FK
+        text name
+        text color
+        timestamptz created_at
+    }
+    TASK_TAGS {
+        bigint task_id PK_FK
+        bigint tag_id PK_FK
+        timestamptz created_at
+    }
+    AUDIT_EVENTS {
+        bigint id PK
+        bigint actor_user_id FK
+        bigint project_id FK
+        bigint task_id FK
+        text event_type
+        jsonb payload
+        timestamptz created_at
+    }

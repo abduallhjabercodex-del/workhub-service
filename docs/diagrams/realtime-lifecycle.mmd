@@ -1,0 +1,18 @@
+sequenceDiagram
+    participant C as Client EventSource
+    participant P as Proxy/TLS
+    participant H as WorkHub SSE Handler
+    participant B as Event Broker
+    participant M as Project Members
+
+    C->>P: GET /api/v1/projects/{id}/events
+    P->>H: Forward request + request ID
+    H->>H: Authenticate + authorize
+    H->>B: Register subscriber
+    B-->>H: Heartbeat every 15-30s
+    M->>H: PATCH task status via REST
+    H->>B: Publish task.updated
+    B-->>H: Fan-out to authorized subscribers
+    H-->>C: SSE event: task.updated
+    C-->>H: Reconnect with Last-Event-ID
+    H->>B: Replay or request snapshot

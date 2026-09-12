@@ -1,0 +1,19 @@
+                                                              QUERY PLAN                                                              
+--------------------------------------------------------------------------------------------------------------------------------------
+ GroupAggregate  (cost=0.15..2376.25 rows=1 width=32) (actual time=44.450..44.453 rows=1 loops=1)
+   Buffers: shared hit=623
+   ->  Nested Loop Left Join  (cost=0.15..1751.21 rows=50002 width=21) (actual time=0.020..32.271 rows=50002 loops=1)
+         Buffers: shared hit=623
+         ->  Index Scan using projects_pkey on projects p  (cost=0.15..8.17 rows=1 width=8) (actual time=0.012..0.017 rows=1 loops=1)
+               Index Cond: (id = 1)
+               Filter: (deleted_at IS NULL)
+               Buffers: shared hit=5
+         ->  Seq Scan on tasks t  (cost=0.00..1243.03 rows=50002 width=21) (actual time=0.006..14.597 rows=50002 loops=1)
+               Filter: ((deleted_at IS NULL) AND (project_id = 1))
+               Buffers: shared hit=618
+ Planning:
+   Buffers: shared hit=256
+ Planning Time: 0.583 ms
+ Execution Time: 44.538 ms
+(15 rows)
+

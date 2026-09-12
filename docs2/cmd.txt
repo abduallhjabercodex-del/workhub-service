@@ -1,0 +1,283 @@
+cd ~/Desktop/WorkHup/workhub-service
+export $(cat .env | grep -v '^#' | xargs)
+go run ./cmd/server
+
+
+
+ sudo -u postgres createuser -s abdullah-jaber                             
+createdb workhub_dev 
+psql -d workhub_dev -f db/migrations/001_init.up.sql  
+ psql -d workhub_dev -f db/migrations/002_query_performance.up.sql   
+psql -d workhub_dev -f db/seed/001_demo.sql 
+
+sudo apt update && sudo apt install -y redis-server 
+sudo systemctl start redis-server 
+redis-cli ping  
+
+
+
+
+1
+curl -i http://127.0.0.1:8080/health
+curl -i http://localhost:8080/health
+go build -o bin/server ./cmd/server
+
+
+
+4
+1. تشغيل جميع الاختبارات
+go test ./... -v
+
+2. تشغيل اختبارات محددة حسب النوع
+
+go test ./internal/service/... -v -run TestCreateProjectValidation
+go test ./internal/service/... -v -run TestTaskStatusValidation
+go test ./internal/service/... -v -run TestMissingProjectAndTask
+
+go test ./internal/config/... -v
+
+3. تشغيل اختبارات الـ Integration (Server + Repo)
+go test ./internal/server/... -v
+
+اختبارات الادا  
+go test ./internal/repository/... -v -run BenchmarkListTasks
+الوصف: تقيس أداء استعلامات قاعدة البيانات في الذاكرة
+go test -run '^$' -bench BenchmarkListTasks -benchmem ./internal/repository
+
+
+اختبارات التكامل (Integration Tests)
+go test ./internal/handler/... -v
+go test ./internal/middleware/... -v
+go test ./internal/cache/... -v
+
+اختبارات قاعدة البيانات (Database Tests)
+psql -d workhub_dev -U abdullah-jaber -h /var/run/postgresql -f db/migrations/constraints.sql
+
+sudo -u postgres psql -d workhub_dev -f db/migrations/constraints.sql
+
+
+
+go test -race ./...
+
+
+
+2. تشغيل جميع الاختبارات مع قاعدة البيانات الحقيقية
+# تعيين متغيرات البيئة
+export DATABASE_URL="postgresql:///workhub_dev?host=/var/run/postgresql&user=abdullah-jaber"
+export DEFAULT_OWNER_ID=1
+export REDIS_URL="redis://127.0.0.1:6379/0"
+export REDIS_CACHE_TTL=30s
+export HOST=127.0.0.1
+export PORT=8080
+export REQUEST_TIMEOUT=5s
+
+# تشغيل جميع الاختبارات
+go test ./... -v
+
+
+
+gofmt -w cmd/server internal
+    go vet ./...   // go vet ./... هو أمر في Go لفحص الكود بحثًا عن أخطاء ومشاكل محتملة قبل تشغيل الاختبارات أو البناء.
+go test ./...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+3. تشغيل الاختبارات مع تغطية الكود
+
+go test ./... -coverprofile=coverage.out
+go tool cover -html=coverage.out
+
+go test -coverprofile=coverage.out ./...
+
+
+5. تشغيل اختبارات Redis المحاكاة
+
+go test ./internal/cache/... -v -run TestProjectSummaryCacheHitMissTTLAndInvalidation
+
+
+6. تشغيل اختبارات محددة مع -run
+# اختبار إنشاء المشروع
+go test ./... -v -run TestProjectAndTaskFlow
+
+# اختبار صحة المدخلات
+go test ./... -v -run TestValidationErrorEnvelope
+
+# اختبارات الـ Middleware
+go test ./... -v -run TestRequestIDIsGeneratedAndReturned
+go test ./... -v -run TestRecoveryReturnsServerError
+go test ./... -v -run TestTimeoutMiddleware
+
+# اختبارات التخزين المؤقت
+go test ./... -v -run TestProjectSummaryCacheHitMissTTLAndInvalidation
+
+
+
+psql -d workhub_dev -f db/migrations/003_messaging_outbox.up.sql
+curl -i -X POST http://localhost:8080/api/v1/projects/4/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"title": "تجربة إرسال رسالة للوسيط والعامل"}'
+
+
+
+
+
+
+
+
+
+
+
+# عرض جميع الجداول
+psql -d workhub_dev -U abdullah-jaber -h /var/run/postgresql -c "\dt"
+
+# عرض الجداول مع التفاصيل
+psql -d workhub_dev -U abdullah-jaber -h /var/run/postgresql -c "\dt+"
+
+# عرض جميع العلاقات (جداول، views، sequences)
+psql -d workhub_dev -U abdullah-jaber -h /var/run/postgresql -c "\d"
+
+
+# عرض هيكل جدول users
+psql -d workhub_dev -U abdullah-jaber -h /var/run/postgresql -c "\d users"
+
+# عرض هيكل جدول projects
+psql -d workhub_dev -U abdullah-jaber -h /var/run/postgresql -c "\d projects"
+
+# عرض هيكل جدول tasks
+psql -d workhub_dev -U abdullah-jaber -h /var/run/postgresql -c "\d tasks"
+
+# عرض هيكل جدول memberships
+psql -d workhub_dev -U abdullah-jaber -h /var/run/postgresql -c "\d memberships"
+
+# عرض هيكل جدول task_tags
+psql -d workhub_dev -U abdullah-jaber -h /var/run/postgresql -c "\d task_tags"
+
+
+
+# عرض جميع المستخدمين
+psql -d workhub_dev -U abdullah-jaber -h /var/run/postgresql -c "SELECT * FROM users;"
+
+# عرض جميع المشاريع
+psql -d workhub_dev -U abdullah-jaber -h /var/run/postgresql -c "SELECT * FROM projects;"
+
+# عرض جميع المهام
+psql -d workhub_dev -U abdullah-jaber -h /var/run/postgresql -c "SELECT * FROM tasks;"
+
+# عرض جميع العضويات
+psql -d workhub_dev -U abdullah-jaber -h /var/run/postgresql -c "SELECT * FROM memberships;"
+
+# عرض جميع العلامات
+psql -d workhub_dev -U abdullah-jaber -h /var/run/postgresql -c "SELECT * FROM tags;"
+
+# عرض علاقات المهام بالعلامات
+psql -d workhub_dev -U abdullah-jaber -h /var/run/postgresql -c "SELECT * FROM task_tags;"
+
+
+# إنشاء مشروع
+curl -i -X POST http://127.0.0.1:8080/api/v1/projects \
+  -H "Content-Type: application/json" \
+  -d '{"name": "مشروع WorkHub"}'
+
+# عرض كل المشاريع
+curl -i http://127.0.0.1:8080/api/v1/projects
+
+# بحث
+curl -i "http://127.0.0.1:8080/api/v1/projects?q=WorkHub"
+
+# ترتيب
+curl -i "http://127.0.0.1:8080/api/v1/projects?sort=name"
+
+export PROJECT_ID='1'
+
+
+# ملخص مشروع (todo / in_progress / done count)
+curl -i http://127.0.0.1:8080/api/v1/projects/{PROJECT_ID}/summary
+
+
+
+
+
+
+# إنشاء مهمة
+curl -i -X POST http://127.0.0.1:8080/api/v1/projects/{PROJECT_ID}/tasks \
+  -H "Content-Type: application/json" \
+  -d '{"title": "تصميم قاعدة البيانات"}'
+
+# عرض كل المهام
+curl -i http://127.0.0.1:8080/api/v1/projects/{PROJECT_ID}/tasks
+
+# فلترة بالحالة
+curl -i "http://127.0.0.1:8080/api/v1/projects/{PROJECT_ID}/tasks?status=todo"
+curl -i "http://127.0.0.1:8080/api/v1/projects/{PROJECT_ID}/tasks?status=in_progress"
+curl -i "http://127.0.0.1:8080/api/v1/projects/{PROJECT_ID}/tasks?status=done"
+
+# بحث + ترتيب + صفحات
+curl -i "http://127.0.0.1:8080/api/v1/projects/{PROJECT_ID}/tasks?status=todo&sort=title&page=1&limit=10"
+
+# جلب مهمة واحدة بالـ ID
+curl -i http://127.0.0.1:8080/api/v1/tasks/{TASK_ID}
+
+
+
+# تغيير الحالة
+curl -i -X PATCH http://127.0.0.1:8080/api/v1/tasks/{TASK_ID} \
+  -H "Content-Type: application/json" \
+  -d '{"status": "in_progress"}'
+
+curl -i -X PATCH http://127.0.0.1:8080/api/v1/tasks/{TASK_ID} \
+  -H "Content-Type: application/json" \
+  -d '{"status": "done"}'
+
+# تغيير العنوان + الحالة معاً
+curl -i -X PATCH http://127.0.0.1:8080/api/v1/tasks/{TASK_ID} \
+  -H "Content-Type: application/json" \
+  -d '{"title": "عنوان جديد", "status": "done"}'
+
+
+
+# تغيير العنوان فقط
+curl -i -X PATCH http://127.0.0.1:8080/api/v1/tasks/{TASK_ID} \
+  -H "Content-Type: application/json" \
+  -d '{"title": "عنوان جديد فقط"}'
+
+# حذف مهمة
+curl -i -X DELETE http://127.0.0.1:8080/api/v1/tasks/{TASK_ID}
+
+
+
+
+
+# إحصائيات المهام حسب الحالة (لكل المشاريع)
+curl -i http://127.0.0.1:8080/api/v1/tasks/stats
+
+
+
+# احصائيات المهام حسب الحالات  لمشروع معين
+curl -i "http://127.0.0.1:8080/api/v1/projects/{PROJECT_ID}/tasks/stats"
+
+
+13. محاكاة خطأ التحقق
+curl -i -X POST http://127.0.0.1:8080/api/v1/projects \
+  -H 'Content-Type: application/json' \
+  -d '{"name":""}'
+PORT=9090 REQUEST_TIMEOUT=10s go run ./cmd/server

@@ -1,0 +1,47 @@
+?   	example.com/day1-go-service/internal/domain	[no test files]
+	example.com/day1-go-service/cmd/server		coverage: 0.0% of statements
+ok  	example.com/day1-go-service/internal/config	0.008s	coverage: 100.0% of statements
+ok  	example.com/day1-go-service/internal/handler	0.003s	coverage: 50.5% of statements
+ok  	example.com/day1-go-service/internal/middleware	0.004s	coverage: 74.1% of statements
+ok  	example.com/day1-go-service/internal/repository	0.002s	coverage: 0.0% of statements [no tests to run]
+ok  	example.com/day1-go-service/internal/service	0.002s	coverage: 62.9% of statements
+example.com/day1-go-service/cmd/server/main.go:17:		main			0.0%
+example.com/day1-go-service/internal/config/config.go:16:	Load			100.0%
+example.com/day1-go-service/internal/handler/api.go:16:		NewAPI			100.0%
+example.com/day1-go-service/internal/handler/api.go:18:		Routes			100.0%
+example.com/day1-go-service/internal/handler/api.go:38:		projects		69.2%
+example.com/day1-go-service/internal/handler/api.go:60:		projectSubresource	66.7%
+example.com/day1-go-service/internal/handler/api.go:74:		taskByID		42.1%
+example.com/day1-go-service/internal/handler/api.go:104:	tasks			29.2%
+example.com/day1-go-service/internal/handler/api.go:141:	writeServiceError	66.7%
+example.com/day1-go-service/internal/handler/api.go:154:	decodeJSON		55.6%
+example.com/day1-go-service/internal/handler/api.go:168:	writeJSON		100.0%
+example.com/day1-go-service/internal/handler/api.go:174:	methodNotAllowed	0.0%
+example.com/day1-go-service/internal/handler/api.go:178:	requestID		100.0%
+example.com/day1-go-service/internal/handler/health.go:14:	Health			0.0%
+example.com/day1-go-service/internal/middleware/http.go:16:	Chain			0.0%
+example.com/day1-go-service/internal/middleware/http.go:20:	RequestID		100.0%
+example.com/day1-go-service/internal/middleware/http.go:32:	ID			66.7%
+example.com/day1-go-service/internal/middleware/http.go:39:	RequestTimeout		100.0%
+example.com/day1-go-service/internal/middleware/http.go:45:	Recovery		100.0%
+example.com/day1-go-service/internal/middleware/http.go:57:	RequestLog		0.0%
+example.com/day1-go-service/internal/middleware/http.go:65:	newRequestID		75.0%
+example.com/day1-go-service/internal/repository/memory.go:33:	NewMemoryRepository	0.0%
+example.com/day1-go-service/internal/repository/memory.go:37:	CreateProject		0.0%
+example.com/day1-go-service/internal/repository/memory.go:44:	ListProjects		0.0%
+example.com/day1-go-service/internal/repository/memory.go:62:	GetProject		0.0%
+example.com/day1-go-service/internal/repository/memory.go:72:	CreateTask		0.0%
+example.com/day1-go-service/internal/repository/memory.go:79:	ListTasks		0.0%
+example.com/day1-go-service/internal/repository/memory.go:98:	GetTask			0.0%
+example.com/day1-go-service/internal/repository/memory.go:108:	UpdateTask		0.0%
+example.com/day1-go-service/internal/repository/memory.go:118:	containsFold		0.0%
+example.com/day1-go-service/internal/repository/memory.go:122:	indexFold		0.0%
+example.com/day1-go-service/internal/repository/memory.go:138:	lower			0.0%
+example.com/day1-go-service/internal/service/workhub.go:27:	NewWorkHub		50.0%
+example.com/day1-go-service/internal/service/workhub.go:31:	CreateProject		100.0%
+example.com/day1-go-service/internal/service/workhub.go:39:	ListProjects		0.0%
+example.com/day1-go-service/internal/service/workhub.go:43:	CreateTask		83.3%
+example.com/day1-go-service/internal/service/workhub.go:54:	GetTask			75.0%
+example.com/day1-go-service/internal/service/workhub.go:62:	ListTasks		0.0%
+example.com/day1-go-service/internal/service/workhub.go:70:	UpdateTask		64.3%
+total:								(statements)		42.6%

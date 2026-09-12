@@ -1,0 +1,6 @@
+flowchart LR
+    Client[HTTP Client\nGET /health] --> Listener[Go HTTP Server\n127.0.0.1:8080]
+    Listener --> Router[http.ServeMux\nroute matching]
+    Router --> Health[Health Handler\ninternal/handler]
+    Health --> Response[HTTP 200\napplication/json]
+    Response --> Client

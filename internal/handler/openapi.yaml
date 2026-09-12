@@ -1,0 +1,91 @@
+openapi: 3.0.3
+info:
+  title: WorkHub API
+  version: 1.0.0
+  description: REST contract for projects and tasks.
+servers:
+  - url: http://127.0.0.1:8080
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Service is healthy
+  /api/v1/projects:
+    get:
+      summary: List projects
+      parameters:
+        - {name: q, in: query, schema: {type: string}}
+        - {name: sort, in: query, schema: {type: string, enum: [name, createdAt]}}
+      responses:
+        '200': {$ref: '#/components/responses/ProjectList'}
+    post:
+      summary: Create project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CreateProject'}
+      responses:
+        '201': {$ref: '#/components/responses/Project'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+  /api/v1/projects/{projectId}/tasks:
+    parameters:
+      - {name: projectId, in: path, required: true, schema: {type: string}}
+    get:
+      summary: List project tasks
+      parameters:
+        - {name: status, in: query, schema: {type: string, enum: [todo, in_progress, done]}}
+        - {name: q, in: query, schema: {type: string}}
+        - {name: sort, in: query, schema: {type: string, enum: [title, createdAt]}}
+        - {name: page, in: query, schema: {type: integer, minimum: 1, default: 1}}
+        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+      responses:
+        '200': {$ref: '#/components/responses/TaskList'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    post:
+      summary: Create task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CreateTask'}
+      responses:
+        '201': {$ref: '#/components/responses/Task'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /api/v1/tasks/{taskId}:
+    parameters:
+      - {name: taskId, in: path, required: true, schema: {type: string}}
+    get:
+      summary: Get task
+      responses:
+        '200': {$ref: '#/components/responses/Task'}
+        '404': {$ref: '#/components/responses/NotFound'}
+    patch:
+      summary: Update task fields
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/UpdateTask'}
+      responses:
+        '200': {$ref: '#/components/responses/Task'}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '404': {$ref: '#/components/responses/NotFound'}
+components:
+  schemas:
+    Project: {type: object, required: [id, name, createdAt], properties: {id: {type: string}, name: {type: string}, createdAt: {type: string, format: date-time}}}
+    Task: {type: object, required: [id, projectId, title, status, createdAt], properties: {id: {type: string}, projectId: {type: string}, title: {type: string}, status: {type: string, enum: [todo, in_progress, done]}, createdAt: {type: string, format: date-time}}}
+    CreateProject: {type: object, required: [name], properties: {name: {type: string, minLength: 1, maxLength: 120}}}
+    CreateTask: {type: object, required: [title], properties: {title: {type: string, minLength: 1, maxLength: 200}}}
+    UpdateTask: {type: object, minProperties: 1, properties: {title: {type: string, minLength: 1, maxLength: 200}, status: {type: string, enum: [todo, in_progress, done]}}}
+    Error: {type: object, required: [code, message], properties: {code: {type: string}, message: {type: string}, requestId: {type: string}}}
+  responses:
+    Project: {description: Created project, content: {application/json: {schema: {type: object, properties: {data: {$ref: '#/components/schemas/Project'}}}}}}
+    ProjectList: {description: Project list, content: {application/json: {schema: {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/Project'}}, meta: {type: object}}}}}}
+    Task: {description: Task response, content: {application/json: {schema: {type: object, properties: {data: {$ref: '#/components/schemas/Task'}}}}}}
+    TaskList: {description: Task list, content: {application/json: {schema: {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/Task'}}, meta: {type: object}}}}}}
+    BadRequest: {description: Validation error, content: {application/json: {schema: {type: object, properties: {error: {$ref: '#/components/schemas/Error'}}}}}}
+    NotFound: {description: Resource not found, content: {application/json: {schema: {type: object, properties: {error: {$ref: '#/components/schemas/Error'}}}}}}
