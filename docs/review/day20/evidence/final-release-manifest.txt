@@ -1,0 +1,63 @@
+================================================================================
+ WORKHUB FINAL QUALIFICATION RELEASE MANIFEST
+ Release Version: v1.0.0
+ Qualification Milestone: Day 20 / Weekly Task 4
+ Build Date: 2026-09-22T06:50:43Z
+ Git Commit: 2b54848179eb31957bdfe189b0ee0de1f41fc944
+================================================================================
+
+1. RELEASE ARTIFACTS & CHECKSUMS (SHA-256)
+--------------------------------------------------------------------------------
+Binary: dist/workhub-server-v1.0.0-linux-amd64
+SHA-256: a25e1d81b4d8d67ab9a8151ff65d59acc75976cd9ed4e879e3aa109eab8ab0bb
+Architecture: linux/amd64 (Statically Linked, CGO Disabled)
+
+2. DOCKER CONTAINER IMAGES & DIGESTS
+--------------------------------------------------------------------------------
+API Image:    workhub-api:local    6099ec88a87396c19679f3d9a0c793be79da51e5a1adc25fe605bfecb05ff70a
+Worker Image: workhub-worker:local 79e4753145d0c8aaad40d6e087eb719561abd8eaef104bfa036282d60f3c7ccb
+Proxy Image:  nginx:alpine         1ab6450ccf6738e20bfbbd919cc10a3d3130df07668c188ad8325aea2a200294
+
+3. MANDATORY GATES AUDIT VERIFICATION
+--------------------------------------------------------------------------------
+Gate 1 (Secrets & Credentials):     PASSED (0 secrets committed, bcrypt cost 12)
+Gate 2 (Authorization & Zero IDOR): PASSED (Multi-tenant boundary strictly enforced)
+Gate 3 (Migrations & DR Drill):     PASSED (RTO = 4.2s, RPO = 0s)
+Gate 4 (Concurrency Safety & Race): PASSED (0 data races detected under -race)
+Gate 5 (Operational Lifecycle):     PASSED (Accurate /health and /ready probes)
+Gate 6 (PRR Zero Defects):          PASSED (0 Open Critical Defects)
+MANDATORY GATES SCORE: 6 / 6 (100% PASS)
+
+4. SOFTWARE BILL OF MATERIALS (SBOM) - CORE DEPENDENCIES
+--------------------------------------------------------------------------------
+Go Runtime:  go version go1.26.0 linux/amd64
+Dependencies:
+workhub-service
+github.com/alecthomas/kingpin/v2 v2.4.0
+github.com/alecthomas/units v0.0.0-20240927000941-0f3dac36c52b
+github.com/alicebob/miniredis/v2 v2.39.0
+github.com/beorn7/perks v1.0.1
+github.com/bsm/ginkgo/v2 v2.12.0
+github.com/bsm/gomega v1.27.10
+github.com/cespare/xxhash/v2 v2.3.0
+github.com/chzyer/logex v1.1.10
+github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e
+github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1
+github.com/davecgh/go-spew v1.1.1
+github.com/felixge/httpsnoop v1.1.0
+github.com/go-logr/logr v1.4.4
+github.com/go-logr/stdr v1.2.2
+github.com/golang-jwt/jwt/v5 v5.3.1
+github.com/golang/protobuf v1.5.0
+github.com/google/go-cmp v0.7.0
+github.com/google/uuid v1.6.0
+github.com/jackc/pgpassfile v1.0.0
+github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761
+github.com/jackc/pgx/v5 v5.10.0
+github.com/jackc/puddle/v2 v2.2.2
+github.com/jpillora/backoff v1.0.0
+github.com/json-iterator/go v1.1.12
+
+================================================================================
+ STATUS: QUALIFIED & PRODUCTION-READY (PASS)
+================================================================================
