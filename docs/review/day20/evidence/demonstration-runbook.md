@@ -87,13 +87,13 @@ Execute the interactive simulation tool:
 * **Action:** Choose option `2` (or run `./scripts/simulate_traffic.sh ratelimit`).
 * **Terminal Output:**
   ```text
-  إرسال 15 طلب تسجيل دخول في أجزاء من الثانية...
-    طلب #1: HTTP 200 OK (مسموح)
+  Dispatching 15 rapid authentication requests in sub-seconds...
+    Request #1:  HTTP 200 OK (Allowed)
     ...
-    طلب #5: HTTP 200 OK (مسموح)
-    طلب #6: HTTP 429 Too Many Requests (تم الحظر بواسطة Rate Limiter!)
+    Request #5:  HTTP 200 OK (Allowed)
+    Request #6:  HTTP 429 Too Many Requests (Blocked by Rate Limiter!)
     ...
-    طلب #15: HTTP 429 Too Many Requests (تم الحظر بواسطة Rate Limiter!)
+    Request #15: HTTP 429 Too Many Requests (Blocked by Rate Limiter!)
   ```
 * **What to Observe:**
   1. **Grafana Stat Card:** The **`Rate Limit 429 Drops`** card in Row 1 immediately jumps to bright **Orange/Red** showing the drop count.

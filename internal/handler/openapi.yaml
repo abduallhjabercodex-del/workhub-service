@@ -2,90 +2,657 @@ openapi: 3.0.3
 info:
   title: WorkHub API
   version: 1.0.0
-  description: REST contract for projects and tasks.
+  description: >
+    Production-ready REST API for WorkHub project management, real-time tasks, 
+    RBAC permissions, audit logging, and JWT session rotation.
 servers:
-  - url: http://127.0.0.1:8080
+  - url: /
+    description: Current Environment
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Health
+    description: Liveness and Readiness probes
+  - name: Authentication
+    description: Registration, Login, Token Refresh, Logout, and User Profile
+  - name: Projects
+    description: Project workspace management and analytics
+  - name: Project Members
+    description: Team membership and RBAC role assignment
+  - name: Tasks
+    description: Task lifecycle, state transitions, and filtering
+
 paths:
   /health:
     get:
-      summary: Health check
+      tags: [Health]
+      summary: Liveness check
+      description: Returns 200 OK when service is running.
       responses:
         '200':
           description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: "ok" }
+
+  /ready:
+    get:
+      tags: [Health]
+      summary: Readiness check
+      description: Returns 200 OK when database and cache dependencies are responsive.
+      responses:
+        '200':
+          description: Service and dependencies are ready
+        '503':
+          description: Database or Redis is unavailable
+
+  /api/v1/auth/register:
+    post:
+      tags: [Authentication]
+      summary: Register a new user
+      description: Registers a new user account and returns JWT tokens.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterInput'
+      responses:
+        '201':
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Email already registered
+
+  /api/v1/auth/login:
+    post:
+      tags: [Authentication]
+      summary: Authenticate user
+      description: Authenticates credentials and issues Access + Refresh Tokens.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginInput'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [Authentication]
+      summary: Refresh Access Token
+      description: Rotates Refresh Token atomically and issues a new Access Token.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshInput'
+      responses:
+        '200':
+          description: Token refreshed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/auth/logout:
+    post:
+      tags: [Authentication]
+      summary: Logout user
+      description: Revokes the specified Refresh Token.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutInput'
+      responses:
+        '204':
+          description: Logged out successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/auth/me:
+    get:
+      tags: [Authentication]
+      summary: Get current user profile
+      description: Returns information about the currently authenticated user.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AuthUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /api/v1/projects:
     get:
-      summary: List projects
+      tags: [Projects]
+      summary: List accessible projects
+      description: Returns projects accessible to the authenticated user.
+      security:
+        - bearerAuth: []
       parameters:
-        - {name: q, in: query, schema: {type: string}}
-        - {name: sort, in: query, schema: {type: string, enum: [name, createdAt]}}
+        - { name: q, in: query, schema: { type: string }, description: Search query for project name }
+        - { name: sort, in: query, schema: { type: string, enum: [name, createdAt] } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
       responses:
-        '200': {$ref: '#/components/responses/ProjectList'}
+        '200':
+          $ref: '#/components/responses/ProjectList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
     post:
-      summary: Create project
+      tags: [Projects]
+      summary: Create a project
+      description: Creates a new project and assigns the creator as owner.
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
-            schema: {$ref: '#/components/schemas/CreateProject'}
+            schema:
+              $ref: '#/components/schemas/CreateProject'
       responses:
-        '201': {$ref: '#/components/responses/Project'}
-        '400': {$ref: '#/components/responses/BadRequest'}
+        '201':
+          $ref: '#/components/responses/ProjectResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/v1/projects/{projectId}/summary:
+    parameters:
+      - { name: projectId, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [Projects]
+      summary: Get project summary analytics
+      description: Returns task counts and member metrics for a project.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Project summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/ProjectSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/projects/{projectId}/members:
+    parameters:
+      - { name: projectId, in: path, required: true, schema: { type: string } }
+    get:
+      tags: [Project Members]
+      summary: List project members
+      description: Returns all team members and their roles in the project.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of members
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ProjectMember'
+                  meta:
+                    type: object
+                    properties:
+                      total: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Project Members]
+      summary: Add or update project member role
+      description: Assigns a user to a project with a specific RBAC role (owner, admin, member, viewer).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddMemberInput'
+      responses:
+        '201':
+          description: Member added successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  meta:
+                    type: object
+                    properties:
+                      message: { type: string, example: "member added successfully" }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/projects/{projectId}/members/{userId}:
+    parameters:
+      - { name: projectId, in: path, required: true, schema: { type: string } }
+      - { name: userId, in: path, required: true, schema: { type: string } }
+    delete:
+      tags: [Project Members]
+      summary: Remove member from project
+      description: Revokes user membership from the project (protected by Last Owner Guard).
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Member removed successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /api/v1/projects/{projectId}/tasks:
     parameters:
-      - {name: projectId, in: path, required: true, schema: {type: string}}
+      - { name: projectId, in: path, required: true, schema: { type: string } }
     get:
-      summary: List project tasks
+      tags: [Tasks]
+      summary: List tasks in project
+      description: Returns tasks belonging to a specific project.
+      security:
+        - bearerAuth: []
       parameters:
-        - {name: status, in: query, schema: {type: string, enum: [todo, in_progress, done]}}
-        - {name: q, in: query, schema: {type: string}}
-        - {name: sort, in: query, schema: {type: string, enum: [title, createdAt]}}
-        - {name: page, in: query, schema: {type: integer, minimum: 1, default: 1}}
-        - {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+        - { name: status, in: query, schema: { type: string, enum: [todo, in_progress, done] } }
+        - { name: q, in: query, schema: { type: string } }
+        - { name: sort, in: query, schema: { type: string, enum: [title, createdAt] } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
       responses:
-        '200': {$ref: '#/components/responses/TaskList'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200':
+          $ref: '#/components/responses/TaskList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
     post:
-      summary: Create task
+      tags: [Tasks]
+      summary: Create a task in project
+      description: Creates a new task inside a project.
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
-            schema: {$ref: '#/components/schemas/CreateTask'}
+            schema:
+              $ref: '#/components/schemas/CreateTask'
       responses:
-        '201': {$ref: '#/components/responses/Task'}
-        '400': {$ref: '#/components/responses/BadRequest'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '201':
+          $ref: '#/components/responses/TaskResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/v1/tasks:
+    get:
+      tags: [Tasks]
+      summary: List global accessible tasks
+      description: Returns all tasks across accessible projects.
+      security:
+        - bearerAuth: []
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [todo, in_progress, done] } }
+        - { name: q, in: query, schema: { type: string } }
+        - { name: sort, in: query, schema: { type: string, enum: [title, createdAt] } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          $ref: '#/components/responses/TaskList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /api/v1/tasks/{taskId}:
     parameters:
-      - {name: taskId, in: path, required: true, schema: {type: string}}
+      - { name: taskId, in: path, required: true, schema: { type: string } }
     get:
-      summary: Get task
+      tags: [Tasks]
+      summary: Get task details
+      description: Returns task details by ID.
+      security:
+        - bearerAuth: []
       responses:
-        '200': {$ref: '#/components/responses/Task'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200':
+          $ref: '#/components/responses/TaskResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
     patch:
-      summary: Update task fields
+      tags: [Tasks]
+      summary: Update task
+      description: Updates task title and/or status (todo, in_progress, done).
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
-            schema: {$ref: '#/components/schemas/UpdateTask'}
+            schema:
+              $ref: '#/components/schemas/UpdateTask'
       responses:
-        '200': {$ref: '#/components/responses/Task'}
-        '400': {$ref: '#/components/responses/BadRequest'}
-        '404': {$ref: '#/components/responses/NotFound'}
+        '200':
+          $ref: '#/components/responses/TaskResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Tasks]
+      summary: Delete task
+      description: Deletes a task from the project.
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Task deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        Paste JWT Access Token retrieved from `/api/v1/auth/login` or `/api/v1/auth/register`. 
+        Example: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...`
+
   schemas:
-    Project: {type: object, required: [id, name, createdAt], properties: {id: {type: string}, name: {type: string}, createdAt: {type: string, format: date-time}}}
-    Task: {type: object, required: [id, projectId, title, status, createdAt], properties: {id: {type: string}, projectId: {type: string}, title: {type: string}, status: {type: string, enum: [todo, in_progress, done]}, createdAt: {type: string, format: date-time}}}
-    CreateProject: {type: object, required: [name], properties: {name: {type: string, minLength: 1, maxLength: 120}}}
-    CreateTask: {type: object, required: [title], properties: {title: {type: string, minLength: 1, maxLength: 200}}}
-    UpdateTask: {type: object, minProperties: 1, properties: {title: {type: string, minLength: 1, maxLength: 200}, status: {type: string, enum: [todo, in_progress, done]}}}
-    Error: {type: object, required: [code, message], properties: {code: {type: string}, message: {type: string}, requestId: {type: string}}}
+    RegisterInput:
+      type: object
+      required: [email, password, displayName]
+      properties:
+        email: { type: string, format: email, example: "user@example.com" }
+        password: { type: string, minLength: 12, example: "SecurePass123!#" }
+        displayName: { type: string, example: "Abdullah Jaber" }
+
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, example: "user@example.com" }
+        password: { type: string, example: "SecurePass123!#" }
+
+    RefreshInput:
+      type: object
+      properties:
+        refreshToken: { type: string, example: "df4a8b...token" }
+
+    LogoutInput:
+      type: object
+      properties:
+        refreshToken: { type: string, example: "df4a8b...token" }
+
+    AuthUser:
+      type: object
+      required: [id, email, displayName]
+      properties:
+        id: { type: string, example: "1" }
+        email: { type: string, example: "user@example.com" }
+        displayName: { type: string, example: "Abdullah Jaber" }
+
+    AuthResponse:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: object
+          required: [user, accessToken, refreshToken]
+          properties:
+            user:
+              $ref: '#/components/schemas/AuthUser'
+            accessToken: { type: string, example: "eyJhbGci..." }
+            refreshToken: { type: string, example: "a3f89..." }
+
+    Project:
+      type: object
+      required: [id, name, createdAt]
+      properties:
+        id: { type: string, example: "1" }
+        name: { type: string, example: "WorkHub Core Service" }
+        createdAt: { type: string, format: date-time }
+
+    CreateProject:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 120, example: "Mobile Client Refactor" }
+
+    ProjectSummary:
+      type: object
+      required: [projectId, totalTasks, todoTasks, inProgressTasks, doneTasks, memberCount]
+      properties:
+        projectId: { type: string, example: "1" }
+        totalTasks: { type: integer, example: 10 }
+        todoTasks: { type: integer, example: 4 }
+        inProgressTasks: { type: integer, example: 3 }
+        doneTasks: { type: integer, example: 3 }
+        memberCount: { type: integer, example: 5 }
+        cachedAt: { type: string, format: date-time }
+
+    ProjectMember:
+      type: object
+      required: [userId, email, displayName, role]
+      properties:
+        userId: { type: string, example: "1" }
+        email: { type: string, example: "admin@example.com" }
+        displayName: { type: string, example: "Admin User" }
+        role: { type: string, enum: [owner, admin, member, viewer], example: "owner" }
+        joinedAt: { type: string, format: date-time }
+
+    AddMemberInput:
+      type: object
+      required: [userId, role]
+      properties:
+        userId: { type: string, example: "2" }
+        role: { type: string, enum: [owner, admin, member, viewer], example: "admin" }
+
+    Task:
+      type: object
+      required: [id, projectId, title, status, createdAt]
+      properties:
+        id: { type: string, example: "101" }
+        projectId: { type: string, example: "1" }
+        title: { type: string, example: "Implement RBAC Auth Middleware" }
+        status: { type: string, enum: [todo, in_progress, done], example: "in_progress" }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CreateTask:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200, example: "Setup PostgreSQL Backup" }
+
+    UpdateTask:
+      type: object
+      minProperties: 1
+      properties:
+        title: { type: string, minLength: 1, maxLength: 200, example: "Updated Task Title" }
+        status: { type: string, enum: [todo, in_progress, done], example: "done" }
+
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: { type: string, example: "forbidden" }
+        message: { type: string, example: "forbidden: insufficient permissions or membership" }
+        requestId: { type: string, example: "req-12345" }
+
   responses:
-    Project: {description: Created project, content: {application/json: {schema: {type: object, properties: {data: {$ref: '#/components/schemas/Project'}}}}}}
-    ProjectList: {description: Project list, content: {application/json: {schema: {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/Project'}}, meta: {type: object}}}}}}
-    Task: {description: Task response, content: {application/json: {schema: {type: object, properties: {data: {$ref: '#/components/schemas/Task'}}}}}}
-    TaskList: {description: Task list, content: {application/json: {schema: {type: object, properties: {data: {type: array, items: {$ref: '#/components/schemas/Task'}}, meta: {type: object}}}}}}
-    BadRequest: {description: Validation error, content: {application/json: {schema: {type: object, properties: {error: {$ref: '#/components/schemas/Error'}}}}}}
-    NotFound: {description: Resource not found, content: {application/json: {schema: {type: object, properties: {error: {$ref: '#/components/schemas/Error'}}}}}}
+    ProjectResponse:
+      description: Project response payload
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                $ref: '#/components/schemas/Project'
+
+    ProjectList:
+      description: Project list response payload
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Project'
+              meta:
+                type: object
+                properties:
+                  page: { type: integer }
+                  limit: { type: integer }
+                  total: { type: integer }
+
+    TaskResponse:
+      description: Task response payload
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                $ref: '#/components/schemas/Task'
+
+    TaskList:
+      description: Task list response payload
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Task'
+              meta:
+                type: object
+                properties:
+                  page: { type: integer }
+                  limit: { type: integer }
+                  total: { type: integer }
+
+    BadRequest:
+      description: Request validation or syntax error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                $ref: '#/components/schemas/Error'
+
+    Unauthorized:
+      description: Authentication required or invalid/expired token
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                $ref: '#/components/schemas/Error'
+
+    Forbidden:
+      description: Insufficient permissions or membership role check failed
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                $ref: '#/components/schemas/Error'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                $ref: '#/components/schemas/Error'

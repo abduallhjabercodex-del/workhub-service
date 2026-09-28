@@ -1,0 +1,7 @@
+NAME               IMAGE                      COMMAND                  SERVICE    CREATED          STATUS                    PORTS
+workhub_api        workhub-api:local          "/bin/workhub-server"    api        49 seconds ago   Up 42 seconds (healthy)   8080/tcp
+workhub_broker     redis:7.4-alpine           "docker-entrypoint.s…"   broker     49 seconds ago   Up 48 seconds (healthy)   6379/tcp
+workhub_postgres   postgres:16.4-alpine3.20   "docker-entrypoint.s…"   postgres   49 seconds ago   Up 48 seconds (healthy)   5432/tcp
+workhub_proxy      nginx:alpine               "/docker-entrypoint.…"   proxy      49 seconds ago   Up 36 seconds             0.0.0.0:8090->80/tcp, [::]:8090->80/tcp
+workhub_redis      redis:7.4-alpine           "docker-entrypoint.s…"   redis      49 seconds ago   Up 48 seconds (healthy)   6379/tcp
+workhub_worker     workhub-worker:local       "/bin/workhub-worker"    worker     49 seconds ago   Up 42 seconds (healthy)   9091/tcp

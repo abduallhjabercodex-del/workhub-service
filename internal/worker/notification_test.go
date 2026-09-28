@@ -6,18 +6,22 @@ import (
 	"time"
 
 	"workhub-service/internal/domain"
-	"workhub-service/internal/messaging"
+	"workhub-service/internal/infrastructure/messaging"
+	"workhub-service/internal/infrastructure/retry"
 )
 
 func testEvent() domain.Event {
 	return domain.Event{ID: "evt-1", Type: "task.created", AggregateType: "task", AggregateID: "7", ProjectID: "1", TaskID: "7", OccurredAt: time.Now().UTC()}
 }
 
+// TestNotificationWorkerRetriesAndDeduplicates يختبر إعادة المحاولة تلقائياً عند فشل الإشعار وتثبيط الرسائل المكررة (Deduplication) لمنع تكرار الإرسال.
 func TestNotificationWorkerRetriesAndDeduplicates(t *testing.T) {
 	broker := messaging.NewBroker(3)
 	store := NewMemoryDeliveryStore()
 	notifier := &MemoryNotifier{Failures: 2}
-	worker := NewNotificationWorker(broker, store, notifier, 3)
+	retryCfg := retry.Config{MaxAttempts: 3, BaseDelay: time.Millisecond, MaxDelay: time.Millisecond}
+	pool := NewWorkerPool(1, 10)
+	worker := NewNotificationWorker(broker, store, notifier, retryCfg, pool)
 	event := testEvent()
 	if err := worker.Process(context.Background(), event); err != nil {
 		t.Fatalf("Process() error = %v", err)
@@ -33,11 +37,14 @@ func TestNotificationWorkerRetriesAndDeduplicates(t *testing.T) {
 	}
 }
 
+// TestNotificationWorkerMovesFailedEventToDeadLetter يختبر نقل الأحداث التي تكرر فشل معالجتها بعد استنفاد محاولات إعادة الإرسال إلى قائمة الرسائل الميتة (Dead Letters).
 func TestNotificationWorkerMovesFailedEventToDeadLetter(t *testing.T) {
 	broker := messaging.NewBroker(2)
 	store := NewMemoryDeliveryStore()
 	notifier := &MemoryNotifier{Failures: 10}
-	worker := NewNotificationWorker(broker, store, notifier, 2)
+	retryCfg := retry.Config{MaxAttempts: 2, BaseDelay: time.Millisecond, MaxDelay: time.Millisecond}
+	pool := NewWorkerPool(1, 10)
+	worker := NewNotificationWorker(broker, store, notifier, retryCfg, pool)
 	event := testEvent()
 	if err := worker.Process(context.Background(), event); err == nil {
 		t.Fatal("Process() error = nil, want retry failure")
@@ -48,11 +55,14 @@ func TestNotificationWorkerMovesFailedEventToDeadLetter(t *testing.T) {
 	}
 }
 
+// TestNotificationWorkerIntegrationConsumesPublishedEvent يختبر التكامل الكلي لعامل الإشعارات (Worker) في استهلاك الأحداث المنشورة على ناقل الأحداث ومعالجتها فورياً.
 func TestNotificationWorkerIntegrationConsumesPublishedEvent(t *testing.T) {
 	broker := messaging.NewBroker(3)
 	store := NewMemoryDeliveryStore()
 	notifier := &MemoryNotifier{}
-	worker := NewNotificationWorker(broker, store, notifier, 3)
+	retryCfg := retry.Config{MaxAttempts: 3, BaseDelay: time.Millisecond, MaxDelay: time.Millisecond}
+	pool := NewWorkerPool(1, 10)
+	worker := NewNotificationWorker(broker, store, notifier, retryCfg, pool)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	done := make(chan error, 1)

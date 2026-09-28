@@ -1,3 +1,9 @@
 bin/
 *.log
 .DS_Store
+coverage.out
+
+# Ignore all environment files except the template
+.env
+.env.*
+!.env.example

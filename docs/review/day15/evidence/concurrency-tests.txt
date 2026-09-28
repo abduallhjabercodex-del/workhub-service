@@ -1,0 +1,24 @@
+# Command: go test -v -race -count=1 ./tests/abuse/quota_test.go ./tests/abuse/credentials_test.go ./internal/worker/pool_test.go
+# Executed on: 2026-09-19
+
+=== RUN   TestQuotaEnforcement
+=== RUN   TestQuotaEnforcement/Create_projects_up_to_limit_5_->_6th_returns_403_quota_exceeded
+=== RUN   TestQuotaEnforcement/Concurrent_creation_race:_20_goroutines_with_limit_5_->_exactly_5_succeed
+--- PASS: TestQuotaEnforcement (2.17s)
+    --- PASS: TestQuotaEnforcement/Create_projects_up_to_limit_5_->_6th_returns_403_quota_exceeded (0.01s)
+    --- PASS: TestQuotaEnforcement/Concurrent_creation_race:_20_goroutines_with_limit_5_->_exactly_5_succeed (1.19s)
+
+=== RUN   TestInvalidCredentials
+=== RUN   TestInvalidCredentials/Refresh_with_Revoked/Reused_Token_Replay_->_401_+_Sessions_Revoked
+2026/09/19 15:01:28 WARN token replay attack detected! revoking all user sessions user_id=1
+--- PASS: TestInvalidCredentials (1.90s)
+
+=== RUN   TestWorkerPool_AllJobsProcessed
+--- PASS: TestWorkerPool_AllJobsProcessed (0.00s)
+=== RUN   TestWorkerPool_Backpressure
+--- PASS: TestWorkerPool_Backpressure (0.00s)
+=== RUN   TestWorkerPool_StopWaitsForInFlight
+--- PASS: TestWorkerPool_StopWaitsForInFlight (0.10s)
+
+PASS
+ok      concurrency_tests_suite  4.17s

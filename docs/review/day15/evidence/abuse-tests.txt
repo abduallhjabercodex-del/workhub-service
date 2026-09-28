@@ -1,0 +1,57 @@
+# Command: go test -v -race -count=1 ./tests/abuse/...
+# Executed on: 2026-09-19
+
+=== RUN   TestInvalidCredentials
+=== RUN   TestInvalidCredentials/Missing_Authorization_Header_->_401
+=== RUN   TestInvalidCredentials/Expired_JWT_->_401_token_expired
+=== RUN   TestInvalidCredentials/Tampered_JWT_->_401_unauthorized
+=== RUN   TestInvalidCredentials/alg:_none_JWT_->_401_unauthorized
+=== RUN   TestInvalidCredentials/iat_in_the_future_->_401_unauthorized
+=== RUN   TestInvalidCredentials/Refresh_with_Revoked/Reused_Token_Replay_->_401_+_Sessions_Revoked
+--- PASS: TestInvalidCredentials (1.90s)
+    --- PASS: TestInvalidCredentials/Missing_Authorization_Header_->_401 (0.00s)
+    --- PASS: TestInvalidCredentials/Expired_JWT_->_401_token_expired (0.00s)
+    --- PASS: TestInvalidCredentials/Tampered_JWT_->_401_unauthorized (0.00s)
+    --- PASS: TestInvalidCredentials/alg:_none_JWT_->_401_unauthorized (0.00s)
+    --- PASS: TestInvalidCredentials/iat_in_the_future_->_401_unauthorized (0.00s)
+    --- PASS: TestInvalidCredentials/Refresh_with_Revoked/Reused_Token_Replay_->_401_+_Sessions_Revoked (0.94s)
+=== RUN   TestForbiddenAccess
+=== RUN   TestForbiddenAccess/Member_tries_to_delete_project_->_403
+=== RUN   TestForbiddenAccess/Viewer_tries_to_create_task_->_403
+=== RUN   TestForbiddenAccess/Admin_tries_to_remove_owner_->_403
+=== RUN   TestForbiddenAccess/Non-member_tries_to_read_project_->_403
+=== RUN   TestForbiddenAccess/Non-admin_user_tries_to_modify_quota_->_403
+--- PASS: TestForbiddenAccess (6.36s)
+    --- PASS: TestForbiddenAccess/Member_tries_to_delete_project_->_403 (0.00s)
+    --- PASS: TestForbiddenAccess/Viewer_tries_to_create_task_->_403 (0.00s)
+    --- PASS: TestForbiddenAccess/Admin_tries_to_remove_owner_->_403 (0.00s)
+    --- PASS: TestForbiddenAccess/Non-member_tries_to_read_project_->_403 (0.00s)
+    --- PASS: TestForbiddenAccess/Non-admin_user_tries_to_modify_quota_->_403 (0.00s)
+=== RUN   TestIdempotencyReplay
+=== RUN   TestIdempotencyReplay/Same_Idempotency-Key_returns_cached_response_with_Idempotent-Replay_header
+=== RUN   TestIdempotencyReplay/Different_Idempotency-Key_creates_a_new_project
+--- PASS: TestIdempotencyReplay (1.39s)
+    --- PASS: TestIdempotencyReplay/Same_Idempotency-Key_returns_cached_response_with_Idempotent-Replay_header (0.00s)
+    --- PASS: TestIdempotencyReplay/Different_Idempotency-Key_creates_a_new_project (0.01s)
+=== RUN   TestQuotaEnforcement
+=== RUN   TestQuotaEnforcement/Create_projects_up_to_limit_5_->_6th_returns_403_quota_exceeded
+=== RUN   TestQuotaEnforcement/Concurrent_creation_race:_20_goroutines_with_limit_5_->_exactly_5_succeed
+--- PASS: TestQuotaEnforcement (2.17s)
+    --- PASS: TestQuotaEnforcement/Create_projects_up_to_limit_5_->_6th_returns_403_quota_exceeded (0.01s)
+    --- PASS: TestQuotaEnforcement/Concurrent_creation_race:_20_goroutines_with_limit_5_->_exactly_5_succeed (1.19s)
+=== RUN   TestRateLimiting
+=== RUN   TestRateLimiting/Login_rate_limiting:_6th_request_gets_429_and_Retry-After_header
+=== RUN   TestRateLimiting/Projects_creation_rate_limiting:_11th_request_gets_429_and_headers_present
+--- PASS: TestRateLimiting (5.38s)
+    --- PASS: TestRateLimiting/Login_rate_limiting:_6th_request_gets_429_and_Retry-After_header (4.46s)
+    --- PASS: TestRateLimiting/Projects_creation_rate_limiting:_11th_request_gets_429_and_headers_present (0.02s)
+=== RUN   TestTimeoutBehavior
+=== RUN   TestTimeoutBehavior/Slow_request_hits_timeout_->_returns_503
+=== RUN   TestTimeoutBehavior/Context_deadline_exceeded_is_handled_without_panic
+=== RUN   TestTimeoutBehavior/Graceful_Shutdown_in-flight_request_completion
+--- PASS: TestTimeoutBehavior (0.39s)
+    --- PASS: TestTimeoutBehavior/Slow_request_hits_timeout_->_returns_503 (0.10s)
+    --- PASS: TestTimeoutBehavior/Context_deadline_exceeded_is_handled_without_panic (0.01s)
+    --- PASS: TestTimeoutBehavior/Graceful_Shutdown_in-flight_request_completion (0.27s)
+PASS
+ok      workhub-service/tests/abuse     18.630s

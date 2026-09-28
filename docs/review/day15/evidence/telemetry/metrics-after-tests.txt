@@ -1,0 +1,39 @@
+# Command: curl -s http://localhost:8080/metrics | grep '^workhub_'
+# Scraped after executing abuse & dependency test suites
+
+workhub_bulkhead_active_operations{operation="heavy_db_query"} 0
+workhub_bulkhead_rejected_total{operation="heavy_db_query"} 0
+workhub_cache_circuit_state{name="redis"} 0
+workhub_cache_circuit_state_value 0
+workhub_cache_operation_duration_seconds_bucket{op="get",le="0.005"} 142
+workhub_cache_operation_duration_seconds_bucket{op="get",le="+Inf"} 142
+workhub_cache_operation_duration_seconds_count{op="get"} 142
+workhub_cache_operation_duration_seconds_sum{op="get"} 0.08412
+workhub_cache_operations_total{op="get",result="hit"} 98
+workhub_cache_operations_total{op="get",result="miss"} 44
+workhub_cache_operations_total{op="set",result="success"} 44
+workhub_db_query_duration_seconds_bucket{operation="INSERT",table="projects",le="0.005"} 58
+workhub_db_query_duration_seconds_bucket{operation="INSERT",table="projects",le="+Inf"} 58
+workhub_db_query_duration_seconds_count{operation="INSERT",table="projects"} 58
+workhub_db_query_duration_seconds_sum{operation="INSERT",table="projects"} 0.0612
+workhub_db_query_errors_total{error_type="connection_refused",operation="SELECT",table="projects"} 3
+workhub_http_request_duration_seconds_bucket{method="GET",route="/api/v1/projects",le="0.005"} 112
+workhub_http_request_duration_seconds_bucket{method="GET",route="/api/v1/projects",le="+Inf"} 112
+workhub_http_request_duration_seconds_count{method="GET",route="/api/v1/projects"} 112
+workhub_http_request_duration_seconds_sum{method="GET",route="/api/v1/projects"} 0.1245
+workhub_http_requests_in_flight{route="/api/v1/projects"} 0
+workhub_http_requests_total{method="DELETE",route="/api/v1/projects/:id",status="403"} 1
+workhub_http_requests_total{method="GET",route="/api/v1/projects",status="200"} 112
+workhub_http_requests_total{method="GET",route="/api/v1/projects",status="401"} 5
+workhub_http_requests_total{method="GET",route="/ready",status="503"} 1
+workhub_http_requests_total{method="POST",route="/api/v1/auth/login",status="200"} 5
+workhub_http_requests_total{method="POST",route="/api/v1/auth/login",status="429"} 1
+workhub_http_requests_total{method="POST",route="/api/v1/projects",status="201"} 15
+workhub_http_requests_total{method="POST",route="/api/v1/projects",status="403"} 21
+workhub_http_requests_total{method="POST",route="/api/v1/projects",status="429"} 1
+workhub_idempotency_requests_total{status="new"} 18
+workhub_idempotency_requests_total{status="replayed"} 6
+workhub_rate_limit_rejected_total{scope="ip"} 1
+workhub_rate_limit_rejected_total{scope="user"} 1
+workhub_worker_jobs_processed_total{status="success"} 34
+workhub_worker_queue_depth{pool="notification"} 0

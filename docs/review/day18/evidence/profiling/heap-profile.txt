@@ -1,0 +1,36 @@
+File: performance.test
+Build ID: ed54de4a4073a5fe6cce7a4a6bee0747d806f38f
+Type: alloc_space
+Time: 2026-09-21 16:41:11 +03
+Showing nodes accounting for 876.14MB, 98.68% of 887.83MB total
+Dropped 67 nodes (cum <= 4.44MB)
+      flat  flat%   sum%        cum   cum%
+  316.10MB 35.60% 35.60%   316.10MB 35.60%  net/http.(*Request).WithContext (partial-inline)
+  209.02MB 23.54% 59.15%   547.59MB 61.68%  net/http.(*timeoutHandler).ServeHTTP
+   70.01MB  7.89% 67.03%   123.51MB 13.91%  context.WithDeadlineCause
+   55.01MB  6.20% 73.23%    55.01MB  6.20%  context.(*cancelCtx).Done
+   53.51MB  6.03% 79.25%    53.51MB  6.03%  time.newTimer
+   36.50MB  4.11% 83.36%   602.59MB 67.87%  workhub-service/internal/middleware.Chain.Chain.RequestLog.func3.func4
+      33MB  3.72% 87.08%       33MB  3.72%  bytes.(*Buffer).grow
+   23.50MB  2.65% 89.73%    23.50MB  2.65%  context.WithValue
+   18.50MB  2.08% 91.81%    18.50MB  2.08%  workhub-service/internal/middleware.newRequestID
+   15.50MB  1.75% 93.56%    15.50MB  1.75%  net/textproto.canonicalMIMEHeaderKey
+      15MB  1.69% 95.25%   563.59MB 63.48%  workhub-service/internal/middleware.Chain.Metrics.func2
+   12.50MB  1.41% 96.66%    45.50MB  5.13%  workhub-service/tests/performance.BenchmarkMiddlewareChain.func1
+    9.50MB  1.07% 97.73%   834.14MB 93.95%  workhub-service/internal/middleware.Chain.RequestID.func5
+    8.50MB  0.96% 98.68%       14MB  1.58%  net/textproto.MIMEHeader.Set (inline)
+         0     0% 98.68%       33MB  3.72%  bytes.(*Buffer).Write
+         0     0% 98.68%   123.51MB 13.91%  context.WithDeadline (inline)
+         0     0% 98.68%   123.51MB 13.91%  context.WithTimeout
+         0     0% 98.68%    45.50MB  5.13%  net/http.(*timeoutHandler).ServeHTTP.func1
+         0     0% 98.68%       33MB  3.72%  net/http.(*timeoutWriter).Write
+         0     0% 98.68%   879.64MB 99.08%  net/http.HandlerFunc.ServeHTTP
+         0     0% 98.68%       10MB  1.13%  net/http.Header.Get
+         0     0% 98.68%       14MB  1.58%  net/http.Header.Set
+         0     0% 98.68%    15.50MB  1.75%  net/textproto.CanonicalMIMEHeaderKey
+         0     0% 98.68%       10MB  1.13%  net/textproto.MIMEHeader.Get
+         0     0% 98.68%   834.14MB 93.95%  testing.(*B).launch
+         0     0% 98.68%   834.14MB 93.95%  testing.(*B).runN
+         0     0% 98.68%    53.51MB  6.03%  time.AfterFunc
+         0     0% 98.68%   834.14MB 93.95%  workhub-service/internal/middleware.Chain.Chain.Recovery.func6.func7
+         0     0% 98.68%   834.14MB 93.95%  workhub-service/tests/performance.BenchmarkMiddlewareChain

@@ -33,17 +33,18 @@ func integrationPool(t *testing.T) *pgxpool.Pool {
 	return pool
 }
 
-func TestPostgresRepositoryCreateTaskWithAuditCommitsAtomically(t *testing.T) {
+// TestPostgresRepositoryCreateTaskWithQuotaCommitsAtomically يختبر إنشاء المهمة وسجل التدقيق (Audit Event) وحساب الكوتا كعملية ذرية (Atomic Transaction) في قاعدة بيانات PostgreSQL الحقيقية.
+func TestPostgresRepositoryCreateTaskWithQuotaCommitsAtomically(t *testing.T) {
 	pool := integrationPool(t)
 	defer pool.Close()
-	repo := NewPostgresRepository(pool, 1)
+	repo := NewPostgresRepository(pool)
 	id := strconv.FormatInt(time.Now().UnixNano(), 10)
-	task := domain.Task{ID: id, ProjectID: "1", Title: "integration commit", Status: "todo", CreatedAt: time.Now().UTC()}
-	created, err := repo.CreateTaskWithAudit(context.Background(), task, domain.AuditEvent{
+	task := domain.Task{ProjectID: "1", Title: "integration commit", Status: "todo", CreatedAt: time.Now().UTC()}
+	created, err := repo.CreateTaskWithQuota(context.Background(), task, domain.AuditEvent{
 		ProjectID: "1", TaskID: id, EventType: "task.created", Payload: []byte(`{"source":"integration"}`), CreatedAt: task.CreatedAt,
-	})
+	}, -1)
 	if err != nil {
-		t.Fatalf("CreateTaskWithAudit() error = %v", err)
+		t.Fatalf("CreateTaskWithQuota() error = %v", err)
 	}
 	var tasks, audits int
 	if err := pool.QueryRow(context.Background(), "SELECT count(*) FROM tasks WHERE id = $1", created.ID).Scan(&tasks); err != nil {
@@ -59,15 +60,16 @@ func TestPostgresRepositoryCreateTaskWithAuditCommitsAtomically(t *testing.T) {
 	_, _ = pool.Exec(context.Background(), "DELETE FROM tasks WHERE id = $1", created.ID)
 }
 
-func TestPostgresRepositoryCreateTaskWithAuditRollsBackOnAuditFailure(t *testing.T) {
+// TestPostgresRepositoryCreateTaskWithQuotaRollsBackOnAuditFailure يختبر تراجع المعاملة (Rollback) بالكامل وعدم حفظ المهمة في قاعدة البيانات في حال حدوث خطأ أثناء كتابة حدث التدقيق.
+func TestPostgresRepositoryCreateTaskWithQuotaRollsBackOnAuditFailure(t *testing.T) {
 	pool := integrationPool(t)
 	defer pool.Close()
-	repo := NewPostgresRepository(pool, 1)
+	repo := NewPostgresRepository(pool)
 	id := strconv.FormatInt(time.Now().UnixNano()+1, 10)
-	task := domain.Task{ID: id, ProjectID: "1", Title: "integration rollback", Status: "todo", CreatedAt: time.Now().UTC()}
-	_, err := repo.CreateTaskWithAudit(context.Background(), task, domain.AuditEvent{
+	task := domain.Task{ProjectID: "1", Title: "integration rollback", Status: "todo", CreatedAt: time.Now().UTC()}
+	_, err := repo.CreateTaskWithQuota(context.Background(), task, domain.AuditEvent{
 		ProjectID: "1", TaskID: id, EventType: "", Payload: []byte(`{}`), CreatedAt: task.CreatedAt,
-	})
+	}, -1)
 	if !errors.Is(err, ErrConstraint) {
 		t.Fatalf("error = %v, want ErrConstraint", err)
 	}
@@ -80,10 +82,11 @@ func TestPostgresRepositoryCreateTaskWithAuditRollsBackOnAuditFailure(t *testing
 	}
 }
 
+// TestPostgresRepositoryMapsNotFoundAndTimeout يختبر تحويل الأخطاء الناتجة من PostgreSQL إلى الأخطاء المعتمدة في النظام مثل ErrNotFound والتعامل مع تجاوز المهلة الزمنيّة (Timeout).
 func TestPostgresRepositoryMapsNotFoundAndTimeout(t *testing.T) {
 	pool := integrationPool(t)
 	defer pool.Close()
-	repo := NewPostgresRepository(pool, 1)
+	repo := NewPostgresRepository(pool)
 	if _, err := repo.GetTask(context.Background(), "9223372036854770000"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("not found error = %v, want ErrNotFound", err)
 	}
@@ -95,8 +98,9 @@ func TestPostgresRepositoryMapsNotFoundAndTimeout(t *testing.T) {
 	}
 }
 
+// TestPostgresRepositoryMigrationFilesExist يختبر وجود ملفات ترحيل وهيكلة قاعدة البيانات (SQL Migrations) في مجلد المشروع.
 func TestPostgresRepositoryMigrationFilesExist(t *testing.T) {
-	for _, name := range []string{"001_init.up.sql", "001_init.down.sql"} {
+	for _, name := range []string{"0001_init.up.sql", "0001_init.down.sql"} {
 		path := filepath.Join("..", "..", "db", "migrations", name)
 		if _, err := os.Stat(path); err != nil {
 			t.Fatalf("migration %s: %v", name, err)

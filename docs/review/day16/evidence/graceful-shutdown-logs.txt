@@ -1,0 +1,22 @@
+workhub_api  | {"time":"2026-09-20T12:20:47.253382996Z","level":"INFO","msg":"postgres connected"}
+workhub_api  | {"time":"2026-09-20T12:20:47.254416644Z","level":"INFO","msg":"redis enabled"}
+workhub_api  | {"time":"2026-09-20T12:20:47.255093422Z","level":"INFO","msg":"distributed redis broker connected","broker_url":"redis://broker:6379/0"}
+workhub_api  | {"time":"2026-09-20T12:20:47.255121357Z","level":"INFO","msg":"standalone worker mode: skipping in-process worker (handled by external worker container)"}
+workhub_api  | {"time":"2026-09-20T12:20:47.255379446Z","level":"INFO","msg":"server listening","address":"0.0.0.0:8080"}
+workhub_api  | {"time":"2026-09-20T12:20:52.294105751Z","level":"INFO","msg":"http request","method":"GET","path":"/ready","status":200,"duration_ms":0,"remote_addr":"[::1]:56020","request_id":"952e62bec15e126a143d898cb7105149"}
+workhub_api  | {"time":"2026-09-20T12:21:07.339271633Z","level":"INFO","msg":"http request","method":"GET","path":"/ready","status":200,"duration_ms":0,"remote_addr":"[::1]:38526","request_id":"f47b6ba754980b420cdf414128bf5296"}
+workhub_api  | {"time":"2026-09-20T12:21:22.387121125Z","level":"INFO","msg":"http request","method":"GET","path":"/ready","status":200,"duration_ms":0,"remote_addr":"[::1]:53506","request_id":"33cab19f98740386ac5256212cef1414"}
+workhub_api  | {"time":"2026-09-20T12:21:24.475023532Z","level":"INFO","msg":"http request","method":"GET","path":"/health","status":200,"duration_ms":0,"remote_addr":"172.27.0.7:42800","request_id":"839ea9eaa0095eb24c800dd08b59691a"}
+workhub_api  | {"time":"2026-09-20T12:21:24.482201229Z","level":"INFO","msg":"http request","method":"GET","path":"/ready","status":200,"duration_ms":0,"remote_addr":"172.27.0.7:42802","request_id":"bbf072405df05b80205aa82f823e5985"}
+workhub_api  | {"time":"2026-09-20T12:21:37.428499269Z","level":"INFO","msg":"http request","method":"GET","path":"/ready","status":200,"duration_ms":0,"remote_addr":"[::1]:53976","request_id":"0368194dc8665c23b9043b50e2b7e728"}
+workhub_api  | {"time":"2026-09-20T12:21:49.457695677Z","level":"INFO","msg":"shutdown signal received"}
+workhub_api  | {"time":"2026-09-20T12:21:49.457921716Z","level":"INFO","msg":"server shut down"}
+--- WORKER LOGS ---
+workhub_worker  | {"time":"2026-09-20T12:20:47.251298857Z","level":"INFO","msg":"workhub worker starting","env":"development","concurrency":3,"queue_size":1000,"health_port":9091}
+workhub_worker  | {"time":"2026-09-20T12:20:47.252875022Z","level":"INFO","msg":"redis delivery store initialized","url":"redis://redis:6379/0"}
+workhub_worker  | {"time":"2026-09-20T12:20:47.254100143Z","level":"INFO","msg":"distributed redis broker connected","broker_url":"redis://broker:6379/0"}
+workhub_worker  | {"time":"2026-09-20T12:20:47.254272711Z","level":"INFO","msg":"worker health server listening","addr":":9091"}
+workhub_worker  | {"time":"2026-09-20T12:21:49.457811022Z","level":"INFO","msg":"worker shutdown signal received (SIGINT/SIGTERM), initiating graceful shutdown"}
+workhub_worker  | {"time":"2026-09-20T12:21:49.457979743Z","level":"INFO","msg":"notification worker loop stopped gracefully"}
+workhub_worker  | {"time":"2026-09-20T12:21:49.458009639Z","level":"INFO","msg":"all background worker tasks completed gracefully"}
+workhub_worker  | {"time":"2026-09-20T12:21:49.458069694Z","level":"INFO","msg":"worker process shutdown complete"}

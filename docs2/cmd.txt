@@ -48,7 +48,7 @@ curl -i -X PATCH http://127.0.0.1:8080/api/v1/tasks/1 \
   -H "Content-Type: application/json" \
   -d '{"status": "in_progress"}'
 
-# 2.7 حذف مهمة (DELETE Task)
+# 2.7 الحذف الناعم لمهمة (DELETE Task - Soft Delete)
 curl -i -X DELETE http://127.0.0.1:8080/api/v1/tasks/1
 
 # 2.8 إحصائيات المهام التجميعية لكل المشاريع

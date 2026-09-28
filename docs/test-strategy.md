@@ -6,12 +6,12 @@
 
 ## هرم الاختبارات
 
-| المستوى | الاختبارات الحالية | المخاطر المغطاة |
-|---|---|---|
-| Unit | اختبارات `config` و`service` و`middleware` | التحقق، حالات المجال، الحالات الفاشلة، request ID، timeout، وpanic recovery. |
-| Integration / HTTP | `internal/handler/api_test.go` | تدفق إنشاء مشروع ومهمة وتحديث مهمة وغلاف أخطاء التحقق. |
-| Benchmark | `internal/repository/memory_test.go` | قياس استعراض 1000 مهمة مع التصفية والترتيب. |
-| End-to-end | تشغيل الخدمة وطلبات curl | إثبات أن wiring الكامل يعمل من HTTP إلى repository. |
+| المستوى            | الاختبارات الحالية                         | المخاطر المغطاة                                                              |
+| :----------------- | :----------------------------------------- | :--------------------------------------------------------------------------- |
+| Unit               | اختبارات `config` و`service` و`middleware` | التحقق، حالات المجال، الحالات الفاشلة، request ID، timeout، وpanic recovery. |
+| Integration / HTTP | `internal/handler/api_test.go`             | تدفق إنشاء مشروع ومهمة وتحديث مهمة وغلاف أخطاء التحقق.                       |
+| Benchmark          | `internal/repository/memory_test.go`       | قياس استعراض 1000 مهمة مع التصفية والترتيب.                                  |
+| End-to-end         | تشغيل الخدمة وطلبات curl                   | إثبات أن wiring الكامل يعمل من HTTP إلى repository.                          |
 
 ## الفحوص الآلية
 

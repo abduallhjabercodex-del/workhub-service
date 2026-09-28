@@ -1,0 +1,94 @@
+groups:
+  - name: workhub-api-alerts
+    rules:
+      # Availability / Error Rate
+      - alert: HighAPIErrorRate
+        expr: |
+          sum(rate(workhub_http_requests_total{status=~"5.."}[5m])) 
+          / 
+          sum(rate(workhub_http_requests_total[5m])) > 0.01
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High API Error Rate (> 1%)"
+          description: "The API is returning 5xx errors for more than 1% of requests over the last 5 minutes."
+
+      # Latency
+      - alert: HighAPILatency
+        expr: |
+          histogram_quantile(0.95, sum(rate(workhub_http_request_duration_seconds_bucket[5m])) by (le)) > 0.25
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High API Latency (P95 > 250ms)"
+          description: "95th percentile latency is exceeding 250ms for the last 5 minutes."
+
+      # Load Shedding / Rate Limiting
+      - alert: LoadSheddingActive
+        expr: rate(workhub_load_shed_rejected_total[2m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API Load Shedding is active"
+          description: "The service is rejecting requests because max in-flight requests limit is reached."
+
+      - alert: HighRateLimitRejections
+        expr: sum(rate(workhub_rate_limit_rejected_total[1m])) > 0
+        for: 0s
+        labels:
+          severity: warning
+        annotations:
+          summary: "Rate limit rejections detected"
+          description: "Requests are being throttled and rejected with HTTP 429."
+
+      # Bulkhead
+      - alert: BulkheadSaturated
+        expr: rate(workhub_bulkhead_rejected_total[2m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Database query bulkhead saturated"
+          description: "Operations are being rejected by the bulkhead (e.g., list tasks). Concurrency limit reached."
+
+      # Circuit Breaker
+      - alert: CacheCircuitBreakerOpen
+        expr: workhub_cache_circuit_state == 2
+        for: 0s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Cache Circuit Breaker is OPEN"
+          description: "Redis cache is failing heavily. Circuit breaker has opened, bypassing cache entirely."
+
+      # Database
+      - alert: HighDatabaseErrors
+        expr: sum(rate(workhub_db_query_errors_total[5m])) > 5
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High Database Error Rate"
+          description: "More than 5 database query errors per second in the last 5 minutes."
+
+      - alert: DatabasePoolExhaustion
+        expr: sum by(state) (workhub_db_pool_connections{state="idle"}) == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Database connection pool exhausted"
+          description: "No idle database connections available for 5 minutes. Consider increasing max conns."
+
+      # Worker
+      - alert: WorkerQueueBackedUp
+        expr: workhub_worker_queue_depth > 500
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Worker Queue is backed up"
+          description: "Worker queue depth has exceeded 500 items for 5 minutes. Consumer may be too slow."

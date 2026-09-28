@@ -12,13 +12,13 @@
 
 *Passing Threshold:* Overall score $\ge 70 / 100$ **AND** All 6 Mandatory Gates marked as **PASS**.
 
-| Task Milestone | Evaluated Focus | Weight | Maximum Score | Evaluator Score |
-|---|---|:---:|:---:|:---:|
-| **Weekly Task 1** | Go Architecture, REST APIs, Domain Modeling, Basic Unit Testing | 15% | 15 | `[      ] / 15` |
-| **Weekly Task 2** | Relational SQL, ACID Transactions, Outbox, Redis Cache, Workers | 20% | 20 | `[      ] / 20` |
-| **Weekly Task 3** | Dual-Token Auth, RBAC Authorization, Rate Limiting, Observability | 25% | 25 | `[      ] / 25` |
-| **Weekly Task 4** | Containers, CI/CD, Profiling, Disaster Recovery, PRR, System Defense | 40% | 40 | `[      ] / 40` |
-| **TOTAL** | **Comprehensive Engineering & Operational Score** | **100%** | **100** | **`[      ] / 100`** |
+| Task Milestone    | Evaluated Focus                                                      |  Weight  | Maximum Score |   Evaluator Score    |
+| :---------------- | :------------------------------------------------------------------- | :------: | :-----------: | :------------------: |
+| **Weekly Task 1** | Go Architecture, REST APIs, Domain Modeling, Basic Unit Testing      |   15%    |      15       |   `[      ] / 15`    |
+| **Weekly Task 2** | Relational SQL, ACID Transactions, Outbox, Redis Cache, Workers      |   20%    |      20       |   `[      ] / 20`    |
+| **Weekly Task 3** | Dual-Token Auth, RBAC Authorization, Rate Limiting, Observability    |   25%    |      25       |   `[      ] / 25`    |
+| **Weekly Task 4** | Containers, CI/CD, Profiling, Disaster Recovery, PRR, System Defense |   40%    |      40       |   `[      ] / 40`    |
+| **TOTAL**         | **Comprehensive Engineering & Operational Score**                    | **100%** |    **100**    | **`[      ] / 100`** |
 
 ---
 
@@ -27,14 +27,14 @@
 > [!CAUTION]
 > **Strict Prerequisite:** A failure in **any single mandatory gate** constitutes an immediate, unconditional **FAIL** for the entire qualification review, regardless of the numerical score above.
 
-| Gate # | Safety & Architecture Threshold | Verified Requirement | Gate Decision |
-|:---:|---|---|:---:|
+|   Gate #   | Safety & Architecture Threshold  | Verified Requirement                                                                   |           Gate Decision            |
+| :--------: | :------------------------------- | :------------------------------------------------------------------------------------- | :--------------------------------: |
 | **Gate 1** | **Secrets & Credential Hygiene** | Zero committed credentials/keys; bcrypt cost $\ge 12$; structured log token redaction. | `[ ] PASS` &nbsp;&nbsp; `[ ] FAIL` |
-| **Gate 2** | **Authorization & Zero IDOR** | 4-tier RBAC (`owner > admin > member > viewer`); zero cross-tenant data leakage. | `[ ] PASS` &nbsp;&nbsp; `[ ] FAIL` |
-| **Gate 3** | **Clean Migrations & DR Drill** | Deterministic forward migrations; proven backup/restore with checksum validation. | `[ ] PASS` &nbsp;&nbsp; `[ ] FAIL` |
-| **Gate 4** | **Concurrency & Code Quality** | Clean formatting (`gofmt`); zero vet issues; zero data races under `go test -race`. | `[ ] PASS` &nbsp;&nbsp; `[ ] FAIL` |
-| **Gate 5** | **Operational Lifecycle** | Accurate `/health` and `/ready` probes; zero-drop graceful shutdown under SIGTERM. | `[ ] PASS` &nbsp;&nbsp; `[ ] FAIL` |
-| **Gate 6** | **Zero PRR Critical Defects** | Zero crash loops; zero silent data corruption; 0 open critical PRR defects. | `[ ] PASS` &nbsp;&nbsp; `[ ] FAIL` |
+| **Gate 2** | **Authorization & Zero IDOR**    | 4-tier RBAC (`owner > admin > member > viewer`); zero cross-tenant data leakage.       | `[ ] PASS` &nbsp;&nbsp; `[ ] FAIL` |
+| **Gate 3** | **Clean Migrations & DR Drill**  | Deterministic forward migrations; proven backup/restore with checksum validation.      | `[ ] PASS` &nbsp;&nbsp; `[ ] FAIL` |
+| **Gate 4** | **Concurrency & Code Quality**   | Clean formatting (`gofmt`); zero vet issues; zero data races under `go test -race`.    | `[ ] PASS` &nbsp;&nbsp; `[ ] FAIL` |
+| **Gate 5** | **Operational Lifecycle**        | Accurate `/health` and `/ready` probes; zero-drop graceful shutdown under SIGTERM.     | `[ ] PASS` &nbsp;&nbsp; `[ ] FAIL` |
+| **Gate 6** | **Zero PRR Critical Defects**    | Zero crash loops; zero silent data corruption; 0 open critical PRR defects.            | `[ ] PASS` &nbsp;&nbsp; `[ ] FAIL` |
 
 ---
 

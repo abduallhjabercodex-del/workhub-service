@@ -1,0 +1,169 @@
+name: WorkHub CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*.*.*' ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  # =========================================================================
+  # Stage 1: Lint & Code Formatting Quality Gate
+  # =========================================================================
+  lint-and-format:
+    name: 1. Lint & Formatting Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go Runtime
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache: true
+
+      - name: Verify Code Formatting (gofmt)
+        run: |
+          echo "Checking code formatting with gofmt..."
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "ERROR: Unformatted files detected:"
+            echo "$unformatted"
+            exit 1
+          fi
+          echo "Code formatting verification: PASS"
+
+      - name: Run Go Vet Static Analysis
+        run: |
+          echo "Running static analysis with go vet..."
+          go vet ./...
+          echo "Static analysis: PASS"
+
+  # =========================================================================
+  # Stage 2: Unit & Integration Tests with Concurrency Race Detector
+  # =========================================================================
+  test-and-race:
+    name: 2. Tests & Race Detector Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go Runtime
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache: true
+
+      - name: Run All Tests with Race Detection (-race)
+        run: |
+          echo "Running unit and concurrency tests with -race..."
+          go test -v -race ./...
+          echo "Tests & Race checks: PASS"
+
+  # =========================================================================
+  # Stage 3: Vulnerability & Dependency Audit Gate
+  # =========================================================================
+  security-audit:
+    name: 3. Security & Vulnerability Audit Gate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go Runtime
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache: true
+
+      - name: Verify Module Dependencies & Checksums
+        run: |
+          echo "Verifying dependency integrity..."
+          go mod verify
+          echo "Dependencies integrity: PASS"
+
+  # =========================================================================
+  # Stage 4: Build & Immutable Artifact Creation
+  # =========================================================================
+  build-and-artifact:
+    name: 4. Build & Immutable Artifact Creation
+    needs: [lint-and-format, test-and-race, security-audit]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go Runtime
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache: true
+
+      - name: Compile Static Production Binaries
+        run: |
+          mkdir -p dist
+          echo "Building static workhub-server..."
+          CGO_ENABLED=0 go build \
+            -tags "netgo,osusergo" \
+            -trimpath \
+            -ldflags="-s -w -extldflags '-static'" \
+            -o dist/workhub-server ./cmd/server
+
+          echo "Building static workhub-worker..."
+          CGO_ENABLED=0 go build \
+            -tags "netgo,osusergo" \
+            -trimpath \
+            -ldflags="-s -w -extldflags '-static'" \
+            -o dist/workhub-worker ./cmd/worker
+
+      - name: Generate SHA-256 Cryptographic Checksums
+        run: |
+          cd dist
+          sha256sum workhub-server workhub-worker > checksums.sha256
+          cat checksums.sha256
+
+      - name: Build Immutable Docker Images & Export Digest
+        run: |
+          COMMIT_SHA=$(git rev-parse --short HEAD)
+          echo "Building Docker images with immutable tag: ${COMMIT_SHA}..."
+          docker build -f Dockerfile.api -t workhub-api:${COMMIT_SHA} .
+          docker build -f Dockerfile.worker -t workhub-worker:${COMMIT_SHA} .
+
+          # Record image IDs & metadata to image-digest.txt
+          echo "=== IMMUTABLE CONTAINER ARTIFACTS ===" > dist/image-digest.txt
+          echo "Commit SHA: ${COMMIT_SHA}" >> dist/image-digest.txt
+          echo "API Image ID: $(docker inspect --format '{{.Id}}' workhub-api:${COMMIT_SHA})" >> dist/image-digest.txt
+          echo "Worker Image ID: $(docker inspect --format '{{.Id}}' workhub-worker:${COMMIT_SHA})" >> dist/image-digest.txt
+          cat dist/image-digest.txt
+
+      - name: Upload Immutable Release Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: workhub-release-package
+          path: dist/
+
+  # =========================================================================
+  # Stage 5: Production Release Gate Sign-Off
+  # =========================================================================
+  release-gate:
+    name: 5. Release Gate & Promotion Sign-Off
+    needs: [build-and-artifact]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify Release Gate Criteria
+        run: |
+          echo "========================================================="
+          echo "All Quality Gates Passed:"
+          echo "  - Formatting & Linting: PASSED"
+          echo "  - Concurrency Race Checks: PASSED"
+          echo "  - Dependency Audit: PASSED"
+          echo "  - Immutable Artifact Creation: PASSED"
+          echo "========================================================="
+          echo "Artifact approved for deployment."

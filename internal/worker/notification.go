@@ -6,9 +6,14 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"time"
 
 	"workhub-service/internal/domain"
-	"workhub-service/internal/messaging"
+	"workhub-service/internal/infrastructure/messaging"
+	"workhub-service/internal/infrastructure/metrics"
+	"workhub-service/internal/infrastructure/retry"
+
+	"github.com/redis/go-redis/v9"
 )
 
 var ErrNotification = errors.New("notification delivery failed")
@@ -23,31 +28,41 @@ type Notifier interface {
 }
 
 type NotificationWorker struct {
-	broker   *messaging.Broker
+	broker   messaging.EventBroker
 	store    DeliveryStore
 	notify   Notifier
-	maxRetry int
+	retryCfg retry.Config
+	pool     *WorkerPool
 }
 
-func NewNotificationWorker(broker *messaging.Broker, store DeliveryStore, notify Notifier, maxRetry int) *NotificationWorker {
-	if maxRetry < 1 {
-		maxRetry = 3
+func NewNotificationWorker(broker messaging.EventBroker, store DeliveryStore, notify Notifier, retryCfg retry.Config, pool *WorkerPool) *NotificationWorker {
+	if retryCfg.MaxAttempts == 0 {
+		retryCfg = retry.DefaultConfig()
 	}
-	return &NotificationWorker{broker: broker, store: store, notify: notify, maxRetry: maxRetry}
+	return &NotificationWorker{broker: broker, store: store, notify: notify, retryCfg: retryCfg, pool: pool}
 }
-
 func (w *NotificationWorker) Run(ctx context.Context) error {
+	w.pool.Start(ctx, w.Process)
+	defer w.pool.Stop()
+
 	ch, unsubscribe := w.broker.Subscribe("task.created", 32)
 	defer unsubscribe()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case event, ok := <-ch:
-			if !ok {
+			if !ok { // ok == false يعني أن Channel أغلقت.
 				return nil
 			}
-			if err := w.Process(ctx, event); err != nil {
+			if err := w.pool.Submit(ctx, event); err != nil {
+				slog.ErrorContext(ctx, "failed to submit to pool; moving to dead letter",
+					"event_id", event.ID,
+					"event_type", event.Type,
+					"task_id", event.TaskID,
+					"error", err,
+				)
 				w.broker.AddDeadLetter(event)
 			}
 		}
@@ -65,18 +80,35 @@ func (w *NotificationWorker) Process(ctx context.Context, event domain.Event) er
 	if already {
 		return nil
 	}
-	var lastErr error
-	for attempt := 1; attempt <= w.maxRetry; attempt++ {
-		if err := w.notify.NotifyTaskCreated(ctx, event); err == nil {
+
+	attempt := 0
+	err = retry.Do(ctx, w.retryCfg, func(ctx context.Context) error {
+		attempt++
+		if attempt > 1 {
+			metrics.WorkerRetriesTotal.WithLabelValues(event.Type).Inc()
+		}
+		err := w.notify.NotifyTaskCreated(ctx, event)
+		if err == nil {
 			if err := w.store.MarkDelivered(ctx, event.ID); err != nil {
 				return err
 			}
 			return nil
-		} else {
-			lastErr = err
 		}
+
+		// Mark 4xx-equivalent errors as permanent.
+		if errors.Is(err, domain.ErrNotFound) ||
+			errors.Is(err, domain.ErrAlreadyExists) ||
+			errors.Is(err, domain.ErrQuotaExceeded) {
+			return retry.Permanent(err)
+		}
+
+		return err
+	})
+
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrNotification, err)
 	}
-	return fmt.Errorf("%w after %d attempts: %v", ErrNotification, w.maxRetry, lastErr)
+	return nil
 }
 
 type MemoryDeliveryStore struct {
@@ -101,6 +133,32 @@ func (s *MemoryDeliveryStore) MarkDelivered(_ context.Context, id string) error 
 	return nil
 }
 
+type RedisDeliveryStore struct {
+	client *redis.Client
+	ttl    time.Duration
+}
+
+func NewRedisDeliveryStore(client *redis.Client, ttl time.Duration) *RedisDeliveryStore {
+	if ttl <= 0 {
+		ttl = 24 * time.Hour
+	}
+	return &RedisDeliveryStore{client: client, ttl: ttl}
+}
+
+func (s *RedisDeliveryStore) AlreadyDelivered(ctx context.Context, id string) (bool, error) {
+	key := "workhub:delivered:" + id
+	n, err := s.client.Exists(ctx, key).Result()
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
+}
+
+func (s *RedisDeliveryStore) MarkDelivered(ctx context.Context, id string) error {
+	key := "workhub:delivered:" + id
+	return s.client.Set(ctx, key, "1", s.ttl).Err()
+}
+
 type LogNotifier struct{ Logger *slog.Logger }
 
 func (n LogNotifier) NotifyTaskCreated(_ context.Context, event domain.Event) error {
@@ -110,7 +168,7 @@ func (n LogNotifier) NotifyTaskCreated(_ context.Context, event domain.Event) er
 	return nil
 }
 
-type MemoryNotifier struct {
+type MemoryNotifier struct { //صممناه لمساعدتنا في الاختبارات.
 	mu       sync.Mutex
 	Events   []domain.Event
 	Failures int

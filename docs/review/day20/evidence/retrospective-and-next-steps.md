@@ -11,17 +11,17 @@
 
 Before analyzing subjective lessons, here are the real, measured operational and code metrics from the running WorkHub system:
 
-| Metric Category | Specific Indicator | Measured Real Value | Production Target | Evaluation |
-|---|---|:---:|:---:|:---:|
-| **Code Coverage** | Security & Resilience (`bulkhead`, `cb`, `auth`, `retry`) | **76.9% – 92.3%** | $\ge 70\%$ | Exceeded 🟢 |
-| **Code Coverage** | HTTP Handlers & Service logic | **38.3% – 46.5%** | $\ge 40\%$ | Acceptable 🟡 |
-| **Throughput** | Loadrunner 50 concurrent workers (Day 18) | **1,850+ RPS** | $\ge 500\text{ RPS}$ | Exceeded 🟢 |
-| **Latency (Normal)** | P50 / P95 / P99 HTTP Request Latency | **2.4ms / 14.8ms / 38.2ms** | P95 $< 100\text{ms}$ | Exceeded 🟢 |
-| **Latency (Degraded)**| P95 under Redis outage (Fail-open to PostgreSQL) | **48.6ms** | P95 $< 250\text{ms}$ | Exceeded 🟢 |
-| **Disaster Recovery** | Database Restore RTO (Recovery Time Objective) | **4.2 seconds** | $\le 30\text{ seconds}$ | Exceeded 🟢 |
-| **Disaster Recovery** | Database Data Loss RPO (Recovery Point Objective) | **0 seconds** (Consistent snapshot)| $\le 1\text{ hour}$ | Exceeded 🟢 |
-| **Resilience MTTR** | Circuit Breaker Cooldown & Recovery MTTR | **12.1 seconds** (10s cooldown + 2s probe) | $\le 30\text{ seconds}$ | Exceeded 🟢 |
-| **Audit Defects** | PRR Automated Zero-Defects Audit | **0 Critical Defects** | 0 Critical Defects | Target Met 🟢 |
+| Metric Category        | Specific Indicator                                        |            Measured Real Value             |    Production Target    |  Evaluation   |
+| :--------------------- | :-------------------------------------------------------- | :----------------------------------------: | :---------------------: | :-----------: |
+| **Code Coverage**      | Security & Resilience (`bulkhead`, `cb`, `auth`, `retry`) |             **76.9% – 92.3%**              |       $\ge 70\%$        |  Exceeded 🟢  |
+| **Code Coverage**      | HTTP Handlers & Service logic                             |             **38.3% – 46.5%**              |       $\ge 40\%$        | Acceptable 🟡 |
+| **Throughput**         | Loadrunner 50 concurrent workers (Day 18)                 |               **1,850+ RPS**               |  $\ge 500\text{ RPS}$   |  Exceeded 🟢  |
+| **Latency (Normal)**   | P50 / P95 / P99 HTTP Request Latency                      |        **2.4ms / 14.8ms / 38.2ms**         |  P95 $< 100\text{ms}$   |  Exceeded 🟢  |
+| **Latency (Degraded)** | P95 under Redis outage (Fail-open to PostgreSQL)          |                 **48.6ms**                 |  P95 $< 250\text{ms}$   |  Exceeded 🟢  |
+| **Disaster Recovery**  | Database Restore RTO (Recovery Time Objective)            |              **4.2 seconds**               | $\le 30\text{ seconds}$ |  Exceeded 🟢  |
+| **Disaster Recovery**  | Database Data Loss RPO (Recovery Point Objective)         |    **0 seconds** (Consistent snapshot)     |   $\le 1\text{ hour}$   |  Exceeded 🟢  |
+| **Resilience MTTR**    | Circuit Breaker Cooldown & Recovery MTTR                  | **12.1 seconds** (10s cooldown + 2s probe) | $\le 30\text{ seconds}$ |  Exceeded 🟢  |
+| **Audit Defects**      | PRR Automated Zero-Defects Audit                          |           **0 Critical Defects**           |   0 Critical Defects    | Target Met 🟢 |
 
 ---
 
@@ -66,12 +66,12 @@ Before analyzing subjective lessons, here are the real, measured operational and
 
 ## 4. Unresolved Technical Debts & Open Items
 
-| Technical Debt | Risk Level | Current Mitigation | Permanent Future Fix |
-|---|:---:|---|---|
-| **In-Memory Rate Limiting** | Medium | Single-replica deployment works accurately. | Implement Redis-backed sliding-window rate limiter across multi-pod cluster. |
-| **Standalone Redis Instances** | Medium | Isolated cache and broker containers prevent memory eviction cross-talk. | Upgrade to Redis Sentinel or Redis Cluster with automated failover. |
-| **Missing Distributed Tracing Exporter** | Low | OpenTelemetry spans created in context with trace IDs printed in logs. | Configure OpenTelemetry Collector exporter forwarding spans to Jaeger or Grafana Tempo. |
-| **Database Connection Pooling** | Low | Sized Go `db.SetMaxOpenConns(25)` handles current load test. | Deploy PgBouncer sidecar for connection multiplexing at 10,000+ RPS. |
+| Technical Debt                           | Risk Level | Current Mitigation                                                       | Permanent Future Fix                                                                    |
+| :--------------------------------------- | :--------: | :----------------------------------------------------------------------- | :-------------------------------------------------------------------------------------- |
+| **In-Memory Rate Limiting**              |   Medium   | Single-replica deployment works accurately.                              | Implement Redis-backed sliding-window rate limiter across multi-pod cluster.            |
+| **Standalone Redis Instances**           |   Medium   | Isolated cache and broker containers prevent memory eviction cross-talk. | Upgrade to Redis Sentinel or Redis Cluster with automated failover.                     |
+| **Missing Distributed Tracing Exporter** |    Low     | OpenTelemetry spans created in context with trace IDs printed in logs.   | Configure OpenTelemetry Collector exporter forwarding spans to Jaeger or Grafana Tempo. |
+| **Database Connection Pooling**          |    Low     | Sized Go `db.SetMaxOpenConns(25)` handles current load test.             | Deploy PgBouncer sidecar for connection multiplexing at 10,000+ RPS.                    |
 
 ---
 

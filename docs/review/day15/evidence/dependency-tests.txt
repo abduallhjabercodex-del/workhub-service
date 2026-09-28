@@ -1,0 +1,21 @@
+# Command: go test -v -race -count=1 ./tests/dependency/...
+# Executed on: 2026-09-19
+
+=== RUN   TestDBFailureScenarios
+=== RUN   TestDBFailureScenarios/GET_/health_returns_200_(Liveness_probe_passes_even_when_DB_is_down)
+=== RUN   TestDBFailureScenarios/GET_/ready_returns_503_(Readiness_probe_fails_when_DB_Ping_fails)
+=== RUN   TestDBFailureScenarios/POST_/api/v1/projects_returns_503_or_500_when_DB_query_fails
+--- PASS: TestDBFailureScenarios (0.01s)
+    --- PASS: TestDBFailureScenarios/GET_/health_returns_200_(Liveness_probe_passes_even_when_DB_is_down) (0.00s)
+    --- PASS: TestDBFailureScenarios/GET_/ready_returns_503_(Readiness_probe_fails_when_DB_Ping_fails) (0.00s)
+    --- PASS: TestDBFailureScenarios/POST_/api/v1/projects_returns_503_or_500_when_DB_query_fails (0.00s)
+=== RUN   TestRedisFailureScenarios
+=== RUN   TestRedisFailureScenarios/GET_project_summary_returns_200_on_cache_miss_when_Redis_is_down_(fail-open)
+=== RUN   TestRedisFailureScenarios/Rate_limit_fails_closed_when_rate_limiter_store_is_exhausted
+=== RUN   TestRedisFailureScenarios/Verify_metric_workhub_cache_circuit_state_registered
+--- PASS: TestRedisFailureScenarios (9.67s)
+    --- PASS: TestRedisFailureScenarios/GET_project_summary_returns_200_on_cache_miss_when_Redis_is_down_(fail-open) (8.59s)
+    --- PASS: TestRedisFailureScenarios/Rate_limit_fails_closed_when_rate_limiter_store_is_exhausted (0.00s)
+    --- PASS: TestRedisFailureScenarios/Verify_metric_workhub_cache_circuit_state_registered (0.00s)
+PASS
+ok      workhub-service/tests/dependency        10.705s

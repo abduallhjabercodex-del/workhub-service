@@ -51,11 +51,11 @@ curl -i -X PATCH http://127.0.0.1:8080/api/v1/tasks/1 \
 # 2.7 حذف مهمة (DELETE Task)
 curl -i -X DELETE http://127.0.0.1:8080/api/v1/tasks/1
 
-# 2.8 إحصائيات المهام التجميعية لكل المشاريع
-curl -i http://127.0.0.1:8080/api/v1/tasks/stats
+# 2.8 ملخص وإحصائيات مشروع معين (Project Summary)
+curl -i http://127.0.0.1:8080/api/v1/projects/1/summary
 
-# 2.9 إحصائيات المهام لمشروع معين
-curl -i http://127.0.0.1:8080/api/v1/projects/1/tasks/stats
+# 2.9 استعراض جميع المهام في النظام عبر المشاريع (Global Tasks Listing)
+curl -i "http://127.0.0.1:8080/api/v1/tasks?status=todo&sort=created_at&page=1&limit=10"
 
 # 2.10 محاكاة خطأ التحقق واختبار غلاف الأخطاء الموحد (Validation Error Envelope)
 curl -i -X POST http://127.0.0.1:8080/api/v1/projects \
@@ -179,3 +179,196 @@ go test -v -race ./...
 # 10.2 التحقق من إصدار Git Tag التراكمي النهائي v0.2.0
 git tag -l
 ===============================================================================
+
+
+
+
+# Priority 3 — Abuse Tests
+go test -v -race -count=1 ./tests/abuse/... > docs/review/day15/evidence/abuse-tests.txt
+
+# Priority 4 — Dependency Failure Tests
+go test -v -race -count=1 ./tests/dependency/... > docs/review/day15/evidence/dependency-tests.txt
+
+# Priority 5 — Concurrency Tests & Race Detector
+go test -v -race -count=1 ./tests/abuse/quota_test.go ./tests/abuse/credentials_test.go ./internal/worker/pool_test.go > docs/review/day15/evidence/concurrency-tests.txt
+go test -race -count=1 ./... > docs/review/day15/evidence/race-detector.txt
+
+# Priority 6 — Telemetry Metrics Export
+curl -s http://localhost:8080/metrics | grep '^workhub_' > docs/review/day15/evidence/telemetry/metrics-after-tests.txt
+
+# Priority 7 — Tagged Release Verification
+git show v1.0.0-week1 --stat > docs/review/day15/evidence/release-tag.txt
+
+
+
+
+git tag -a v1.0.0-week1 -m "Week 1 deliverable: RBAC, quotas, resilience, observability"
+
+# تصدير/نسخ عينة التتبع إلى مجلد التقييم
+cat trace_output.json > docs/review/day15/evidence/telemetry/one-trace.json
+
+
+
+
+migrate -path db/migrations -database "$DATABASE_URL" up 1
+migrate -path db/migrations -database "$DATABASE_URL" goto 4
+migrate -path db/migrations -database "$DATABASE_URL" down 1
+
+-------------------------------------------------------------------------------
+📌 [اليوم 16: الحاويات وعمليات التشغيل Day 16 - Containers & Runtime Operations]
+-------------------------------------------------------------------------------
+# 16.1 بناء صور الحاويات المصغرة مع التجميع الساكن
+docker build -f Dockerfile.api -t workhub-api:local .
+docker build -f Dockerfile.worker -t workhub-worker:local .
+
+# 16.2 قياس حجم الصور (< 35MB)
+docker images | grep workhub-
+
+# 16.3 إثبات تشغيل العمليات كمستخدم غير جذري (UID 10001)
+docker run --rm --entrypoint id workhub-api:local
+docker run --rm --entrypoint id workhub-worker:local
+
+# 16.4 التحقق من صحة ملف docker-compose.yml
+docker compose config --quiet
+
+# 16.5 إطلاق المنظومة الخماسية في الخلفية بأمر واحد
+docker compose up -d
+
+# 16.6 استعراض حالة الحاويات والفحوصات الصحية (Healthy Status)
+docker compose ps
+
+# 16.7 فحص صحة وجاهزية الـ API عبر موزع Nginx
+curl -i http://localhost:8090/health
+curl -i http://localhost:8090/ready
+
+# 16.8 [المناورة 1] الإغلاق السلس (Graceful Shutdown Drill)
+docker compose stop api worker
+docker compose logs api --tail 20
+docker compose logs worker --tail 20
+docker compose start api worker
+
+# 16.9 [المناورة 2] استمرارية البيانات (Data Persistence Drill)
+docker compose exec postgres psql -U workhub -d workhub_dev -c "INSERT INTO projects (name, owner_user_id) VALUES ('Day 16 Persistence Drill Project', 1) RETURNING id, name, created_at;"
+docker compose down
+docker compose up -d
+docker compose exec postgres psql -U workhub -d workhub_dev -c "SELECT id, name, created_at FROM projects WHERE name='Day 16 Persistence Drill Project';"
+
+# 16.10 [المناورة 3] النسخ الاحتياطي والاستعادة (Backup & Restore Drill)
+docker compose exec -T postgres pg_dump -U workhub workhub_dev > docs/review/day16/evidence/backup.sql
+head -n 15 docs/review/day16/evidence/backup.sql
+
+# 16.11 [المناورة 4] الفشل والتعافي الذاتي (Failure & Resilience Drill)
+docker compose stop postgres
+curl -i http://localhost:8090/ready
+docker compose start postgres
+sleep 8
+curl -i http://localhost:8090/ready
+
+# 16.12 مراقبة استهلاك الموارد المباشر (CPU & Memory Limits)
+docker stats --no-stream
+
+-------------------------------------------------------------------------------
+📌 [اليوم 17: التكامل والنشر المستمر Day 17 - CI/CD & Deployment Architecture]
+-------------------------------------------------------------------------------
+# 17.1 فحص تنسيق الأكواد القياسي (Formatting Gate)
+gofmt -l .
+
+# 17.2 التحليل الساكن للكود لاكتشاف الأخطاء الكامنة (Static Analysis)
+go vet ./...
+
+# 17.3 تشغيل جميع الاختبارات مع مكتشف تعارض الموارد المتزامنة (Race Detector)
+go test -v -race ./...
+
+# 17.4 فحص سلامة وتطابق البصمات المشفرة للحزم البرمجية (Dependency Audit)
+go mod verify
+
+# 17.5 تشغيل خط أنابيب التكامل المستمر المحلي الموحّد بالكامل (Local CI Pipeline Runner)
+./scripts/ci.sh | tee docs/review/day17/evidence/pipeline-run.txt
+
+# 17.6 استعراض البصمات المشفرة للأصول الثابتة غير القابلة للتغيير (Immutable Artifacts)
+cat docs/review/day17/evidence/checksums.sha256
+cat docs/review/day17/evidence/image-digest.txt
+
+# 17.7 اختبار حزمة مفاتيح الميزات البرمجية والتراجع الفوري (Feature Flags & Kill Switch)
+go test -v -race ./internal/featureflag/...
+
+# 17.8 أمر التراجع الفوري السريع في بيئات النشر الحقيقية (Rollback Runbook Commands)
+# Kubernetes:
+# kubectl rollout undo deployment/workhub-api
+# Docker Compose:
+# IMAGE_TAG=v0.2.0 docker compose -f docker-compose.prod.yml up -d --no-deps api worker
+
+-------------------------------------------------------------------------------
+📌 [اليوم 18: الأداء وحماية البيانات والعمليات Day 18 - Performance & Operations]
+-------------------------------------------------------------------------------
+# 18.1 تشغيل اختبارات قياس الأداء المعيارية لحل عنق الزجاجة (Benchmark Before vs After)
+go test -bench=. -benchmem -benchtime=2s ./tests/performance/...
+
+# 18.2 تشغيل اختبارات الـ Rate Limit بـ 429 والتدهور السلس (Graceful Degradation)
+go test -v -race ./tests/performance/... -run="TestRateLimit|TestGracefulDegradation"
+
+# 18.3 تشغيل اختبار الحمل الذاتي مع معايير القبول (Load Testing with Thresholds)
+./scripts/load_test.sh baseline
+./scripts/load_test.sh after
+cat docs/review/day18/evidence/load-test/comparison.txt
+
+# 18.4 استخراج أدلة التحليل التشغيلي (Profiling Evidence)
+go test -bench=BenchmarkMiddlewareChain -benchtime=2s -cpuprofile=/tmp/cpu.pprof -memprofile=/tmp/mem.pprof -blockprofile=/tmp/block.pprof ./tests/performance/...
+go tool pprof -top /tmp/cpu.pprof > docs/review/day18/evidence/profiling/cpu-profile.txt
+go tool pprof -top -alloc_space /tmp/mem.pprof > docs/review/day18/evidence/profiling/heap-profile.txt
+go tool pprof -top /tmp/block.pprof > docs/review/day18/evidence/profiling/block-profile.txt
+
+# 18.5 تنفيذ مناورة التعافي من الكوارث والتحقق من سجل الكناري المستعاد (DR Drill)
+./scripts/backup_restore_drill.sh
+cat docs/review/day18/evidence/dr-drill/restored-record-proof.txt
+
+cat monitoring/alerts.yml
+
+
+-------------------------------------------------------------------------------
+📌 [اليوم 19: مراجعة الجاهزية للإنتاج Day 19 - Production-Readiness Review]
+-------------------------------------------------------------------------------
+# 19.1 استعراض وتدقيق سجلات القرارات المعمارية (Architecture Decision Records - ADRs)
+ls -la docs/review/day19/adrs/
+cat docs/review/day19/adrs/adr-001-separate-cache-and-broker.md
+cat docs/review/day19/adrs/adr-002-dual-token-auth-replay-protection.md
+cat docs/review/day19/adrs/adr-003-expand-contract-database-migrations.md
+cat docs/review/day19/adrs/adr-004-resilience-circuit-breaker-bulkhead.md
+cat docs/review/day19/adrs/adr-005-feature-flags-and-kill-switch.md
+
+# 19.2 التحقق من تطابق وتزامن مواصفات OpenAPI مع المتحكمات البرمجية
+diff -u <(grep -E '^(  /[a-z]|      summary:)' docs/openapi.yaml) <(grep -E '^(  /[a-z]|      summary:)' internal/handler/openapi.yaml)
+curl -sI http://localhost:8090/api/v1/docs | grep "HTTP/1.1 200 OK"
+
+# 19.3 استعراض حزمة الأدلة التشغيلية والإعداد واستكشاف الأخطاء والقيود المعروفة
+cat docs/review/day19/setup-guide.md
+cat docs/review/day19/troubleshooting-guide.md
+cat docs/review/day19/known-limitations.md
+
+# 19.4 تشغيل فحص التدقيق الآلي الشامل للجاهزية للإنتاج (PRR Automated Audit)
+chmod +x scripts/prr_audit.sh
+./scripts/prr_audit.sh | tee docs/review/day19/evidence/zero-defects-audit.txt
+
+# 19.5 استعراض سجل معالجة الملاحظات وإثبات تصفير العيوب الحرجة (Remediation Log)
+cat docs/review/day19/evidence/remediation-log.md
+cat docs/review/day19/evidence/completed-checklist.md
+
+# 19.6 استعراض حزمة مرشح الإصدار للإنتاج مع شهادة SBOM والبصمات المشفرة
+cat docs/review/day19/evidence/release-candidate.txt
+
+
+
+# فقط سجلات الـ API server (بدون redis, postgres)
+docker compose logs -f api
+
+# فقط التحذيرات والأخطاء (تجاهل الـ INFO)
+docker compose logs -f api | grep -E '"level":"(WARN|ERROR)"'
+
+# فقط سجلات Login (لاختبار مشكلتنا)
+docker compose logs -f api | grep -i "login"
+
+# فقط الأخطاء 4xx و 5xx
+docker compose logs -f api | grep -E '"status":[45][0-9]{2}'
+
+# إخفاء سجلات health check و metrics (أكثر شيء يزعج)
+docker compose logs -f api | grep -v '"path":"/health"\|"path":"/ready"\|"path":"/metrics"'

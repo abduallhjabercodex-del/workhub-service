@@ -1,0 +1,480 @@
+[1m========================================================================[0m
+[1m           WORKHUB CI/CD PIPELINE (LOCAL & AUTOMATED RUNNER)            [0m
+[1m========================================================================[0m
+
+[1m[Stage 1/5] Code Formatting & Static Analysis Gate[0m
+Running gofmt check...
+[0;32m✓ Code formatting (gofmt): PASS[0m
+Running go vet static analysis...
+[0;32m✓ Static analysis (go vet): PASS[0m
+
+[1m[Stage 2/5] Tests & Concurrency Race Detection Gate[0m
+Running all tests with -race...
+?   	workhub-service/cmd/server	[no test files]
+?   	workhub-service/cmd/worker	[no test files]
+=== RUN   TestPasswordHashingAndVerification
+--- PASS: TestPasswordHashingAndVerification (2.16s)
+=== RUN   TestJWTGenerationValidationAndExpiry
+--- PASS: TestJWTGenerationValidationAndExpiry (0.00s)
+=== RUN   TestGenerateOpaqueTokenAndHash
+--- PASS: TestGenerateOpaqueTokenAndHash (0.00s)
+PASS
+ok  	workhub-service/internal/auth	3.179s
+=== RUN   TestBulkhead_Do_Success
+--- PASS: TestBulkhead_Do_Success (0.05s)
+=== RUN   TestBulkhead_Do_ContextCancellation
+--- PASS: TestBulkhead_Do_ContextCancellation (0.00s)
+PASS
+ok  	workhub-service/internal/bulkhead	1.076s
+=== RUN   TestProjectSummaryCacheHitMissTTLAndInvalidation
+2026/09/20 17:17:16 INFO cache miss key=workhub:project-summary:42
+2026/09/20 17:17:16 INFO cache hit key=workhub:project-summary:42
+2026/09/20 17:17:16 INFO cache invalidated project_id=42
+2026/09/20 17:17:16 INFO cache miss key=workhub:project-summary:42
+2026/09/20 17:17:16 INFO cache miss key=workhub:project-summary:42
+redis: 2026/09/20 17:17:16 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:46155: connect: connection refused
+redis: 2026/09/20 17:17:17 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:46155: connect: connection refused
+redis: 2026/09/20 17:17:17 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:46155: connect: connection refused
+redis: 2026/09/20 17:17:17 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:46155: connect: connection refused
+2026/09/20 17:17:17 WARN cache read failed error="dial tcp 127.0.0.1:46155: connect: connection refused"
+redis: 2026/09/20 17:17:18 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:46155: connect: connection refused
+redis: 2026/09/20 17:17:18 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:46155: connect: connection refused
+redis: 2026/09/20 17:17:19 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:46155: connect: connection refused
+redis: 2026/09/20 17:17:19 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:46155: connect: connection refused
+2026/09/20 17:17:19 WARN cache write failed error="dial tcp 127.0.0.1:46155: connect: connection refused"
+redis: 2026/09/20 17:17:20 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:46155: connect: connection refused
+redis: 2026/09/20 17:17:20 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:46155: connect: connection refused
+redis: 2026/09/20 17:17:20 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:46155: connect: connection refused
+redis: 2026/09/20 17:17:21 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:46155: connect: connection refused
+2026/09/20 17:17:21 WARN cache invalidation failed error="dial tcp 127.0.0.1:46155: connect: connection refused"
+--- PASS: TestProjectSummaryCacheHitMissTTLAndInvalidation (5.17s)
+=== RUN   TestCacheStampedeProtection
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+2026/09/20 17:17:21 INFO cache miss key=workhub:project-summary:proj-stampede-1
+--- PASS: TestCacheStampedeProtection (0.04s)
+PASS
+ok  	workhub-service/internal/cache	6.235s
+=== RUN   TestBreaker_StateTransitions
+--- PASS: TestBreaker_StateTransitions (0.00s)
+PASS
+ok  	workhub-service/internal/circuitbreaker	1.022s
+=== RUN   TestLoadValidation
+=== RUN   TestLoadValidation/defaults
+=== RUN   TestLoadValidation/valid_custom_values
+=== RUN   TestLoadValidation/invalid_port
+=== RUN   TestLoadValidation/invalid_timeout
+--- PASS: TestLoadValidation (0.00s)
+    --- PASS: TestLoadValidation/defaults (0.00s)
+    --- PASS: TestLoadValidation/valid_custom_values (0.00s)
+    --- PASS: TestLoadValidation/invalid_port (0.00s)
+    --- PASS: TestLoadValidation/invalid_timeout (0.00s)
+=== RUN   TestLoadDoesNotDependOnProcessEnvironment
+--- PASS: TestLoadDoesNotDependOnProcessEnvironment (0.00s)
+PASS
+ok  	workhub-service/internal/config	1.018s
+?   	workhub-service/internal/domain	[no test files]
+=== RUN   TestFeatureFlag_BasicToggle
+--- PASS: TestFeatureFlag_BasicToggle (0.00s)
+=== RUN   TestFeatureFlag_GradualRollout
+--- PASS: TestFeatureFlag_GradualRollout (0.00s)
+=== RUN   TestFeatureFlag_EmergencyKillSwitch
+--- PASS: TestFeatureFlag_EmergencyKillSwitch (0.00s)
+PASS
+ok  	workhub-service/internal/featureflag	(cached)
+=== RUN   TestProjectAndTaskFlow
+2026/09/20 17:17:16 INFO user registered successfully user_id=1 email=test@example.com
+2026/09/20 17:17:16 INFO project created project_id=1 owner_user_id=1
+2026/09/20 17:17:16 INFO task created task_id=1 project_id=1 actor_user_id=1
+--- PASS: TestProjectAndTaskFlow (0.66s)
+=== RUN   TestValidationErrorEnvelope
+2026/09/20 17:17:17 INFO user registered successfully user_id=1 email=test@example.com
+--- PASS: TestValidationErrorEnvelope (0.65s)
+=== RUN   TestHealthAndReadinessEndpoints
+2026/09/20 17:17:18 INFO user registered successfully user_id=1 email=test@example.com
+--- PASS: TestHealthAndReadinessEndpoints (0.64s)
+=== RUN   TestAuthRegistrationLoginRefreshLogoutFlow
+2026/09/20 17:17:18 INFO user registered successfully user_id=1 email=testuser@example.com
+2026/09/20 17:17:20 INFO login successful user_id=1 email=testuser@example.com
+2026/09/20 17:17:20 INFO token refreshed successfully user_id=1
+2026/09/20 17:17:20 WARN token replay attack detected! revoking all user sessions user_id=1
+2026/09/20 17:17:20 WARN failed to revoke refresh token on logout error="not found"
+--- PASS: TestAuthRegistrationLoginRefreshLogoutFlow (1.93s)
+=== RUN   TestSecurityHeadersOnAPIRoutes
+2026/09/20 17:17:20 INFO user registered successfully user_id=1 email=usera@example.com
+2026/09/20 17:17:21 INFO user registered successfully user_id=2 email=userb@example.com
+--- PASS: TestSecurityHeadersOnAPIRoutes (1.45s)
+=== RUN   TestHorizontalAndVerticalPrivilegeEscalation
+2026/09/20 17:17:22 INFO user registered successfully user_id=1 email=usera@example.com
+2026/09/20 17:17:23 INFO user registered successfully user_id=2 email=userb@example.com
+2026/09/20 17:17:23 INFO project created project_id=1 owner_user_id=1
+2026/09/20 17:17:24 INFO user registered successfully user_id=3 email=userc@example.com
+2026/09/20 17:17:24 INFO project member added project_id=1 target_user_id=3 role=member actor_user_id=1
+--- PASS: TestHorizontalAndVerticalPrivilegeEscalation (2.36s)
+=== RUN   TestPayloadSizeLimiter
+2026/09/20 17:17:24 INFO user registered successfully user_id=1 email=usera@example.com
+2026/09/20 17:17:25 INFO user registered successfully user_id=2 email=userb@example.com
+--- PASS: TestPayloadSizeLimiter (1.56s)
+PASS
+ok  	workhub-service/internal/handler	10.272s
+?   	workhub-service/internal/logger	[no test files]
+=== RUN   TestBrokerPublishSubscribe
+--- PASS: TestBrokerPublishSubscribe (0.00s)
+=== RUN   TestBrokerConcurrentUnsubscribeDuringPublish
+--- PASS: TestBrokerConcurrentUnsubscribeDuringPublish (0.10s)
+=== RUN   TestBrokerSlowSubscriberDoesNotBlockFastSubscriber
+    broker_test.go:110: Publish returned err = context deadline exceeded (expected if slow subscriber context timed out)
+--- PASS: TestBrokerSlowSubscriberDoesNotBlockFastSubscriber (0.20s)
+=== RUN   TestBrokerDeadLettersBounded
+--- PASS: TestBrokerDeadLettersBounded (0.00s)
+=== RUN   TestBrokerClose
+--- PASS: TestBrokerClose (0.00s)
+=== RUN   TestRedisBroker_PublishAndSubscribe
+--- PASS: TestRedisBroker_PublishAndSubscribe (0.06s)
+=== RUN   TestRedisBroker_DeadLetter
+--- PASS: TestRedisBroker_DeadLetter (0.00s)
+PASS
+ok  	workhub-service/internal/messaging	1.377s
+?   	workhub-service/internal/metrics	[no test files]
+=== RUN   TestAuthMiddlewareValidAndInvalidToken
+--- PASS: TestAuthMiddlewareValidAndInvalidToken (0.00s)
+=== RUN   TestRequestIDIsGeneratedAndReturned
+--- PASS: TestRequestIDIsGeneratedAndReturned (0.00s)
+=== RUN   TestRecoveryReturnsServerError
+--- PASS: TestRecoveryReturnsServerError (0.00s)
+=== RUN   TestTimeoutMiddleware
+--- PASS: TestTimeoutMiddleware (0.00s)
+=== RUN   TestIdempotency
+2026/09/20 17:17:16 INFO idempotent replay key=key123
+--- PASS: TestIdempotency (0.00s)
+=== RUN   TestLoadShedding
+2026/09/20 17:17:16 WARN load shedding request max_in_flight=2 current_in_flight=3
+--- PASS: TestLoadShedding (0.00s)
+=== RUN   TestSecurityHeaders
+--- PASS: TestSecurityHeaders (0.00s)
+=== RUN   TestRateLimiter
+--- PASS: TestRateLimiter (0.00s)
+PASS
+ok  	workhub-service/internal/middleware	1.032s
+=== RUN   TestPostgresRepositoryCreateTaskWithQuotaCommitsAtomically
+    postgres_integration_test.go:38: WORKHUB_TEST_DATABASE_URL is not set
+--- SKIP: TestPostgresRepositoryCreateTaskWithQuotaCommitsAtomically (0.00s)
+=== RUN   TestPostgresRepositoryCreateTaskWithQuotaRollsBackOnAuditFailure
+    postgres_integration_test.go:65: WORKHUB_TEST_DATABASE_URL is not set
+--- SKIP: TestPostgresRepositoryCreateTaskWithQuotaRollsBackOnAuditFailure (0.00s)
+=== RUN   TestPostgresRepositoryMapsNotFoundAndTimeout
+    postgres_integration_test.go:87: WORKHUB_TEST_DATABASE_URL is not set
+--- SKIP: TestPostgresRepositoryMapsNotFoundAndTimeout (0.00s)
+=== RUN   TestPostgresRepositoryMigrationFilesExist
+--- PASS: TestPostgresRepositoryMigrationFilesExist (0.00s)
+=== RUN   TestPostgresRepositoryAtomicProjectQuotaWithAdvisoryLocks
+    quota_integration_test.go:41: WORKHUB_TEST_DATABASE_URL is not set
+--- SKIP: TestPostgresRepositoryAtomicProjectQuotaWithAdvisoryLocks (0.00s)
+=== RUN   TestPostgresRepositoryAtomicTaskQuotaWithAdvisoryLocks
+    quota_integration_test.go:101: WORKHUB_TEST_DATABASE_URL is not set
+--- SKIP: TestPostgresRepositoryAtomicTaskQuotaWithAdvisoryLocks (0.00s)
+=== RUN   TestPostgresRepositoryUserQuotaAdminOverrides
+    quota_integration_test.go:168: WORKHUB_TEST_DATABASE_URL is not set
+--- SKIP: TestPostgresRepositoryUserQuotaAdminOverrides (0.00s)
+PASS
+ok  	workhub-service/internal/repository	1.025s
+=== RUN   TestDo_Success
+--- PASS: TestDo_Success (0.00s)
+=== RUN   TestDo_PermanentError
+--- PASS: TestDo_PermanentError (0.00s)
+=== RUN   TestDo_MaxAttemptsReached
+--- PASS: TestDo_MaxAttemptsReached (0.00s)
+=== RUN   TestDo_ContextCancellation
+--- PASS: TestDo_ContextCancellation (0.04s)
+=== RUN   TestBackoffAndJitterGrowth
+--- PASS: TestBackoffAndJitterGrowth (0.06s)
+PASS
+ok  	workhub-service/internal/retry	1.121s
+=== RUN   TestCreateProjectValidation
+2026/09/20 17:17:16 INFO user registered successfully user_id=1 email=user1@example.com
+=== RUN   TestCreateProjectValidation/valid
+2026/09/20 17:17:16 INFO project created project_id=1 owner_user_id=1
+=== RUN   TestCreateProjectValidation/empty_name
+=== RUN   TestCreateProjectValidation/unauthorized
+--- PASS: TestCreateProjectValidation (0.67s)
+    --- PASS: TestCreateProjectValidation/valid (0.00s)
+    --- PASS: TestCreateProjectValidation/empty_name (0.00s)
+    --- PASS: TestCreateProjectValidation/unauthorized (0.00s)
+=== RUN   TestTaskStatusAndRBACValidation
+2026/09/20 17:17:17 INFO user registered successfully user_id=1 email=owner@example.com
+2026/09/20 17:17:18 INFO user registered successfully user_id=2 email=viewer@example.com
+2026/09/20 17:17:18 INFO project created project_id=1 owner_user_id=1
+2026/09/20 17:17:18 INFO task created task_id=1 project_id=1 actor_user_id=1
+--- PASS: TestTaskStatusAndRBACValidation (1.28s)
+=== RUN   TestMissingProjectAndTask
+2026/09/20 17:17:18 INFO user registered successfully user_id=1 email=user@example.com
+--- PASS: TestMissingProjectAndTask (0.64s)
+=== RUN   TestDeleteTaskAndLastOwnerGuard
+2026/09/20 17:17:19 INFO user registered successfully user_id=1 email=owner1@example.com
+2026/09/20 17:17:19 INFO project created project_id=1 owner_user_id=1
+2026/09/20 17:17:19 INFO task created task_id=1 project_id=1 actor_user_id=1
+--- PASS: TestDeleteTaskAndLastOwnerGuard (0.65s)
+=== RUN   TestAtomicRefreshTokenAndReplayDetection
+2026/09/20 17:17:20 INFO user registered successfully user_id=1 email=testrefresh@example.com
+2026/09/20 17:17:20 INFO token refreshed successfully user_id=1
+2026/09/20 17:17:20 WARN token replay attack detected! revoking all user sessions user_id=1
+2026/09/20 17:17:20 WARN token replay attack detected! revoking all user sessions user_id=1
+--- PASS: TestAtomicRefreshTokenAndReplayDetection (0.64s)
+=== RUN   TestConcurrentRefreshTokenRace
+2026/09/20 17:17:20 INFO user registered successfully user_id=1 email=concrefresh@example.com
+2026/09/20 17:17:20 INFO token refreshed successfully user_id=1
+2026/09/20 17:17:20 WARN token replay attack detected! revoking all user sessions user_id=1
+2026/09/20 17:17:20 WARN token replay attack detected! revoking all user sessions user_id=1
+2026/09/20 17:17:20 WARN token replay attack detected! revoking all user sessions user_id=1
+2026/09/20 17:17:20 WARN token replay attack detected! revoking all user sessions user_id=1
+--- PASS: TestConcurrentRefreshTokenRace (0.64s)
+PASS
+ok  	workhub-service/internal/service	5.542s
+?   	workhub-service/internal/telemetry	[no test files]
+?   	workhub-service/internal/version	[no test files]
+=== RUN   TestNotificationWorkerRetriesAndDeduplicates
+--- PASS: TestNotificationWorkerRetriesAndDeduplicates (0.00s)
+=== RUN   TestNotificationWorkerMovesFailedEventToDeadLetter
+--- PASS: TestNotificationWorkerMovesFailedEventToDeadLetter (0.00s)
+=== RUN   TestNotificationWorkerIntegrationConsumesPublishedEvent
+--- PASS: TestNotificationWorkerIntegrationConsumesPublishedEvent (0.01s)
+=== RUN   TestWorkerPool_AllJobsProcessed
+--- PASS: TestWorkerPool_AllJobsProcessed (0.00s)
+=== RUN   TestWorkerPool_Backpressure
+--- PASS: TestWorkerPool_Backpressure (0.00s)
+=== RUN   TestWorkerPool_StopWaitsForInFlight
+--- PASS: TestWorkerPool_StopWaitsForInFlight (0.00s)
+PASS
+ok  	workhub-service/internal/worker	1.037s
+=== RUN   TestInvalidCredentials
+2026/09/20 17:17:17 INFO user registered successfully user_id=1 email=credtest@example.com
+=== RUN   TestInvalidCredentials/Missing_Authorization_Header_->_401
+=== RUN   TestInvalidCredentials/Expired_JWT_->_401_token_expired
+=== RUN   TestInvalidCredentials/Tampered_JWT_->_401_unauthorized
+=== RUN   TestInvalidCredentials/alg:_none_JWT_->_401_unauthorized
+=== RUN   TestInvalidCredentials/iat_in_the_future_->_401_unauthorized
+=== RUN   TestInvalidCredentials/Refresh_with_Revoked/Reused_Token_Replay_->_401_+_Sessions_Revoked
+2026/09/20 17:17:17 INFO login successful user_id=1 email=credtest@example.com
+2026/09/20 17:17:17 INFO token refreshed successfully user_id=1
+2026/09/20 17:17:17 WARN token replay attack detected! revoking all user sessions user_id=1
+2026/09/20 17:17:17 WARN token replay attack detected! revoking all user sessions user_id=1
+--- PASS: TestInvalidCredentials (1.31s)
+    --- PASS: TestInvalidCredentials/Missing_Authorization_Header_->_401 (0.00s)
+    --- PASS: TestInvalidCredentials/Expired_JWT_->_401_token_expired (0.00s)
+    --- PASS: TestInvalidCredentials/Tampered_JWT_->_401_unauthorized (0.00s)
+    --- PASS: TestInvalidCredentials/alg:_none_JWT_->_401_unauthorized (0.00s)
+    --- PASS: TestInvalidCredentials/iat_in_the_future_->_401_unauthorized (0.00s)
+    --- PASS: TestInvalidCredentials/Refresh_with_Revoked/Reused_Token_Replay_->_401_+_Sessions_Revoked (0.65s)
+=== RUN   TestForbiddenAccess
+2026/09/20 17:17:18 INFO user registered successfully user_id=1 email=owner@example.com
+2026/09/20 17:17:18 INFO user registered successfully user_id=2 email=admin@example.com
+2026/09/20 17:17:19 INFO user registered successfully user_id=3 email=member@example.com
+2026/09/20 17:17:20 INFO user registered successfully user_id=4 email=viewer@example.com
+2026/09/20 17:17:20 INFO user registered successfully user_id=5 email=nonmember@example.com
+2026/09/20 17:17:20 INFO project created project_id=1 owner_user_id=1
+2026/09/20 17:17:20 INFO project member added project_id=1 target_user_id=2 role=admin actor_user_id=1
+2026/09/20 17:17:20 INFO project member added project_id=1 target_user_id=3 role=member actor_user_id=1
+2026/09/20 17:17:20 INFO project member added project_id=1 target_user_id=4 role=viewer actor_user_id=1
+=== RUN   TestForbiddenAccess/Member_tries_to_delete_project_->_403
+=== RUN   TestForbiddenAccess/Viewer_tries_to_create_task_->_403
+=== RUN   TestForbiddenAccess/Admin_tries_to_remove_owner_->_403
+=== RUN   TestForbiddenAccess/Non-member_tries_to_read_project_->_403
+=== RUN   TestForbiddenAccess/Non-admin_user_tries_to_modify_quota_->_403
+--- PASS: TestForbiddenAccess (3.20s)
+    --- PASS: TestForbiddenAccess/Member_tries_to_delete_project_->_403 (0.00s)
+    --- PASS: TestForbiddenAccess/Viewer_tries_to_create_task_->_403 (0.00s)
+    --- PASS: TestForbiddenAccess/Admin_tries_to_remove_owner_->_403 (0.00s)
+    --- PASS: TestForbiddenAccess/Non-member_tries_to_read_project_->_403 (0.00s)
+    --- PASS: TestForbiddenAccess/Non-admin_user_tries_to_modify_quota_->_403 (0.00s)
+=== RUN   TestIdempotencyReplay
+2026/09/20 17:17:21 INFO user registered successfully user_id=1 email=idempotent@example.com
+=== RUN   TestIdempotencyReplay/Same_Idempotency-Key_returns_cached_response_with_Idempotent-Replay_header
+2026/09/20 17:17:21 INFO project created project_id=1 owner_user_id=1
+2026/09/20 17:17:21 INFO idempotent replay key=unique-request-key-12345
+=== RUN   TestIdempotencyReplay/Different_Idempotency-Key_creates_a_new_project
+2026/09/20 17:17:21 INFO project created project_id=2 owner_user_id=1
+2026/09/20 17:17:21 INFO project created project_id=3 owner_user_id=1
+--- PASS: TestIdempotencyReplay (0.86s)
+    --- PASS: TestIdempotencyReplay/Same_Idempotency-Key_returns_cached_response_with_Idempotent-Replay_header (0.00s)
+    --- PASS: TestIdempotencyReplay/Different_Idempotency-Key_creates_a_new_project (0.00s)
+=== RUN   TestQuotaEnforcement
+2026/09/20 17:17:22 INFO user registered successfully user_id=1 email=quotatest@example.com
+=== RUN   TestQuotaEnforcement/Create_projects_up_to_limit_5_->_6th_returns_403_quota_exceeded
+2026/09/20 17:17:22 INFO project created project_id=1 owner_user_id=1
+2026/09/20 17:17:22 INFO project created project_id=2 owner_user_id=1
+2026/09/20 17:17:22 INFO project created project_id=3 owner_user_id=1
+2026/09/20 17:17:22 INFO project created project_id=4 owner_user_id=1
+2026/09/20 17:17:22 INFO project created project_id=5 owner_user_id=1
+2026/09/20 17:17:22 WARN quota exceeded for projects user_id=1 max=5
+=== RUN   TestQuotaEnforcement/Concurrent_creation_race:_20_goroutines_with_limit_5_->_exactly_5_succeed
+2026/09/20 17:17:23 INFO user registered successfully user_id=2 email=racequota@example.com
+2026/09/20 17:17:23 INFO project created project_id=6 owner_user_id=2
+2026/09/20 17:17:23 INFO project created project_id=7 owner_user_id=2
+2026/09/20 17:17:23 INFO project created project_id=8 owner_user_id=2
+2026/09/20 17:17:23 INFO project created project_id=9 owner_user_id=2
+2026/09/20 17:17:23 INFO project created project_id=10 owner_user_id=2
+2026/09/20 17:17:23 WARN quota exceeded for projects user_id=2 max=5
+2026/09/20 17:17:23 WARN quota exceeded for projects user_id=2 max=5
+2026/09/20 17:17:23 WARN quota exceeded for projects user_id=2 max=5
+2026/09/20 17:17:23 WARN quota exceeded for projects user_id=2 max=5
+2026/09/20 17:17:23 WARN quota exceeded for projects user_id=2 max=5
+--- PASS: TestQuotaEnforcement (1.59s)
+    --- PASS: TestQuotaEnforcement/Create_projects_up_to_limit_5_->_6th_returns_403_quota_exceeded (0.01s)
+    --- PASS: TestQuotaEnforcement/Concurrent_creation_race:_20_goroutines_with_limit_5_->_exactly_5_succeed (0.81s)
+=== RUN   TestRateLimiting
+2026/09/20 17:17:24 INFO user registered successfully user_id=1 email=ratelimit@example.com
+=== RUN   TestRateLimiting/Login_rate_limiting:_6th_request_gets_429_and_Retry-After_header
+2026/09/20 17:17:24 INFO login successful user_id=1 email=ratelimit@example.com
+2026/09/20 17:17:25 INFO login successful user_id=1 email=ratelimit@example.com
+2026/09/20 17:17:26 INFO login successful user_id=1 email=ratelimit@example.com
+2026/09/20 17:17:26 INFO login successful user_id=1 email=ratelimit@example.com
+2026/09/20 17:17:27 INFO login successful user_id=1 email=ratelimit@example.com
+=== RUN   TestRateLimiting/Projects_creation_rate_limiting:_11th_request_gets_429_and_headers_present
+2026/09/20 17:17:27 INFO project created project_id=1 owner_user_id=1
+2026/09/20 17:17:27 INFO project created project_id=2 owner_user_id=1
+2026/09/20 17:17:27 INFO project created project_id=3 owner_user_id=1
+2026/09/20 17:17:27 INFO project created project_id=4 owner_user_id=1
+2026/09/20 17:17:27 INFO project created project_id=5 owner_user_id=1
+2026/09/20 17:17:27 INFO project created project_id=6 owner_user_id=1
+2026/09/20 17:17:27 INFO project created project_id=7 owner_user_id=1
+2026/09/20 17:17:27 INFO project created project_id=8 owner_user_id=1
+2026/09/20 17:17:27 INFO project created project_id=9 owner_user_id=1
+2026/09/20 17:17:27 INFO project created project_id=10 owner_user_id=1
+--- PASS: TestRateLimiting (4.27s)
+    --- PASS: TestRateLimiting/Login_rate_limiting:_6th_request_gets_429_and_Retry-After_header (3.50s)
+    --- PASS: TestRateLimiting/Projects_creation_rate_limiting:_11th_request_gets_429_and_headers_present (0.01s)
+=== RUN   TestTimeoutBehavior
+=== RUN   TestTimeoutBehavior/Slow_request_hits_timeout_->_returns_503
+=== RUN   TestTimeoutBehavior/Context_deadline_exceeded_is_handled_without_panic
+=== RUN   TestTimeoutBehavior/Graceful_Shutdown_in-flight_request_completion
+--- PASS: TestTimeoutBehavior (0.38s)
+    --- PASS: TestTimeoutBehavior/Slow_request_hits_timeout_->_returns_503 (0.10s)
+    --- PASS: TestTimeoutBehavior/Context_deadline_exceeded_is_handled_without_panic (0.01s)
+    --- PASS: TestTimeoutBehavior/Graceful_Shutdown_in-flight_request_completion (0.27s)
+PASS
+ok  	workhub-service/tests/abuse	12.633s
+=== RUN   TestDBFailureScenarios
+=== RUN   TestDBFailureScenarios/GET_/health_returns_200_(Liveness_probe_passes_even_when_DB_is_down)
+=== RUN   TestDBFailureScenarios/GET_/ready_returns_503_(Readiness_probe_fails_when_DB_Ping_fails)
+=== RUN   TestDBFailureScenarios/POST_/api/v1/projects_returns_503_or_500_when_DB_query_fails
+--- PASS: TestDBFailureScenarios (0.00s)
+    --- PASS: TestDBFailureScenarios/GET_/health_returns_200_(Liveness_probe_passes_even_when_DB_is_down) (0.00s)
+    --- PASS: TestDBFailureScenarios/GET_/ready_returns_503_(Readiness_probe_fails_when_DB_Ping_fails) (0.00s)
+    --- PASS: TestDBFailureScenarios/POST_/api/v1/projects_returns_503_or_500_when_DB_query_fails (0.00s)
+=== RUN   TestRedisFailureScenarios
+2026/09/20 17:17:17 INFO user registered successfully user_id=1 email=redistest@example.com
+2026/09/20 17:17:17 INFO project created project_id=1 owner_user_id=1
+=== RUN   TestRedisFailureScenarios/GET_project_summary_returns_200_on_cache_miss_when_Redis_is_down_(fail-open)
+redis: 2026/09/20 17:17:17 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:44707: connect: connection refused
+redis: 2026/09/20 17:17:17 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:44707: connect: connection refused
+redis: 2026/09/20 17:17:18 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:44707: connect: connection refused
+redis: 2026/09/20 17:17:18 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:44707: connect: connection refused
+2026/09/20 17:17:18 WARN cache read failed error="dial tcp 127.0.0.1:44707: connect: connection refused"
+redis: 2026/09/20 17:17:19 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:44707: connect: connection refused
+redis: 2026/09/20 17:17:19 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:44707: connect: connection refused
+redis: 2026/09/20 17:17:20 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:44707: connect: connection refused
+redis: 2026/09/20 17:17:20 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:44707: connect: connection refused
+2026/09/20 17:17:20 WARN cache read failed error="dial tcp 127.0.0.1:44707: connect: connection refused"
+redis: 2026/09/20 17:17:20 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:44707: connect: connection refused
+redis: 2026/09/20 17:17:21 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:44707: connect: connection refused
+redis: 2026/09/20 17:17:21 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:44707: connect: connection refused
+redis: 2026/09/20 17:17:22 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:44707: connect: connection refused
+2026/09/20 17:17:22 WARN cache write failed error="dial tcp 127.0.0.1:44707: connect: connection refused"
+redis: 2026/09/20 17:17:22 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:44707: connect: connection refused
+redis: 2026/09/20 17:17:23 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:44707: connect: connection refused
+redis: 2026/09/20 17:17:23 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:44707: connect: connection refused
+redis: 2026/09/20 17:17:24 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:44707: connect: connection refused
+2026/09/20 17:17:24 WARN cache read failed error="dial tcp 127.0.0.1:44707: connect: connection refused"
+redis: 2026/09/20 17:17:24 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:44707: connect: connection refused
+redis: 2026/09/20 17:17:24 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:44707: connect: connection refused
+redis: 2026/09/20 17:17:25 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:44707: connect: connection refused
+redis: 2026/09/20 17:17:25 pool.go:762: redis: connection pool: failed to dial after 5 attempts: dial tcp 127.0.0.1:44707: connect: connection refused
+2026/09/20 17:17:25 WARN cache read failed error="dial tcp 127.0.0.1:44707: connect: connection refused"
+=== RUN   TestRedisFailureScenarios/Rate_limit_fails_closed_when_rate_limiter_store_is_exhausted
+=== RUN   TestRedisFailureScenarios/Verify_metric_workhub_cache_circuit_state_registered
+--- PASS: TestRedisFailureScenarios (9.27s)
+    --- PASS: TestRedisFailureScenarios/GET_project_summary_returns_200_on_cache_miss_when_Redis_is_down_(fail-open) (8.60s)
+    --- PASS: TestRedisFailureScenarios/Rate_limit_fails_closed_when_rate_limiter_store_is_exhausted (0.00s)
+    --- PASS: TestRedisFailureScenarios/Verify_metric_workhub_cache_circuit_state_registered (0.00s)
+PASS
+ok  	workhub-service/tests/dependency	10.288s
+[0;32m✓ Tests & Race checks: PASS[0m
+
+[1m[Stage 3/5] Security & Dependency Audit Gate[0m
+Verifying module dependencies integrity...
+all modules verified
+[0;32m✓ Dependency checksums & integrity: PASS[0m
+
+[1m[Stage 4/5] Build & Immutable Artifact Creation Gate[0m
+Compiling static workhub-server binary...
+Compiling static workhub-worker binary...
+Generating SHA-256 cryptographic checksums...
+d589635faeb8c7726b88ffacc5716e524b56dd92bbb7b408a02d13c366eb85a6  workhub-server
+ac8c9c3044d708dd92ffd76e2fe2ae0b8922f9755b6f424bb9993bb0e0351e03  workhub-worker
+Building Docker container images with commit SHA tag...
+=== IMMUTABLE CONTAINER ARTIFACTS ===
+Commit Tag: 2b54848
+API Image ID: sha256:f1ec72866517012a4f3bab030f8712ab68669f291f9c82765661323c8a03afae
+Worker Image ID: sha256:cb75750d8d933ae26ca6359f5b81406b1d35da7ad48f8221255c98b7b5111575
+Generated at: 2026-09-20T14:18:30Z
+[0;32m✓ Immutable artifact creation: PASS[0m
+
+[1m[Stage 5/5] Release Gate Promotion Sign-Off[0m
+Validating release criteria:
+  [x] Code formatting conforms to standard (gofmt)
+  [x] Static analysis passed without warnings (go vet)
+  [x] 100% tests passed with zero data races (-race)
+  [x] Dependency hashes verified (go mod verify)
+  [x] Cryptographic SHA-256 artifacts generated
+  [x] Immutable container digests recorded
+[0;32m========================================================================[0m
+[0;32m★ PIPELINE STATUS: 100% PASSED - ARTIFACT APPROVED FOR PRODUCTION DEPLOY[0m
+[0;32m========================================================================[0m

@@ -136,8 +136,8 @@ Executed automated test drill via `./scripts/simulate_traffic.sh breaker`:
 
 ## 4. Engineering Takeaways & Lessons Learned
 
-| Vector | Insight | Standardized Practice |
-|---|---|---|
-| **Zero-Alloc Go** | Low-level byte buffer manipulation without bounds validation can corrupt upstream protocols silently. | Always assert exact buffer slicing in unit tests and verify against reverse-proxy RFC parsers. |
-| **State Machines** | Lazy-evaluated state transitions create observability blind spots in polling-based monitoring. | State machines in distributed systems must either use event-driven background timers or export state transition event counters. |
-| **Telemetry Alignment** | If metric transitions occur faster than `scrape_interval`, gauges fail to represent state. | Use cumulative transition counters (`circuit_transitions_total`) in tandem with instantaneous state gauges. |
+| Vector                  | Insight                                                                                               | Standardized Practice                                                                                                           |
+| :---------------------- | :---------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------ |
+| **Zero-Alloc Go**       | Low-level byte buffer manipulation without bounds validation can corrupt upstream protocols silently. | Always assert exact buffer slicing in unit tests and verify against reverse-proxy RFC parsers.                                  |
+| **State Machines**      | Lazy-evaluated state transitions create observability blind spots in polling-based monitoring.        | State machines in distributed systems must either use event-driven background timers or export state transition event counters. |
+| **Telemetry Alignment** | If metric transitions occur faster than `scrape_interval`, gauges fail to represent state.            | Use cumulative transition counters (`circuit_transitions_total`) in tandem with instantaneous state gauges.                     |

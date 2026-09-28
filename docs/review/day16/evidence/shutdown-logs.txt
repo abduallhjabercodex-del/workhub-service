@@ -1,0 +1,9 @@
+=== WORKHUB API GRACEFUL SHUTDOWN LOGS ===
+{"time":"2026-09-20T12:38:49.545968306Z","level":"INFO","msg":"shutdown signal received"}
+{"time":"2026-09-20T12:38:49.546212275Z","level":"INFO","msg":"server shut down"}
+
+=== WORKHUB WORKER GRACEFUL SHUTDOWN LOGS ===
+{"time":"2026-09-20T12:38:49.544976171Z","level":"INFO","msg":"worker shutdown signal received (SIGINT/SIGTERM), initiating graceful shutdown"}
+{"time":"2026-09-20T12:38:49.545097994Z","level":"INFO","msg":"notification worker loop stopped gracefully"}
+{"time":"2026-09-20T12:38:49.545118082Z","level":"INFO","msg":"all background worker tasks completed gracefully"}
+{"time":"2026-09-20T12:38:49.545157822Z","level":"INFO","msg":"worker process shutdown complete"}

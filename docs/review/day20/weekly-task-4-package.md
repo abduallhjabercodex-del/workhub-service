@@ -80,22 +80,22 @@ The portfolio is structured across five core engineering milestones:
 
 ## 3. Weekly Task 4 Submission Checklist
 
-| # | Submission Item | Verified Location | Status |
-|:---:|---|---|:---:|
-| 1 | **Dockerized Runtime Stack** | `docker-compose.yml`, `Dockerfile.api`, `Dockerfile.worker` | **PASS 🟢** |
-| 2 | **Automated CI/CD Pipeline** | `.github/workflows/ci.yml`, `scripts/ci.sh` | **PASS 🟢** |
-| 3 | **Performance Profiling & Load Tests** | `docs/review/day18/evidence/load-test/`, `pprof` reports | **PASS 🟢** |
-| 4 | **Automated Backup & Restore Drill** | `scripts/backup_restore_drill.sh`, `dr-drill/` report | **PASS 🟢** |
-| 5 | **5 Architectural Decision Records (ADRs)** | `docs/review/day19/adrs/` (ADR-001 through ADR-005) | **PASS 🟢** |
-| 6 | **Production Runbooks** | `setup-guide.md`, `troubleshooting-guide.md` | **PASS 🟢** |
-| 7 | **PRR Zero-Defects Audit** | `scripts/prr_audit.sh` (0 open critical findings) | **PASS 🟢** |
-| 8 | **Tradeoffs & Scalability Defense** | `system-tradeoffs-and-architecture.md`, `system-design-qa.md` | **PASS 🟢** |
-| 9 | **Diagnosed Injected Defect RCA** | `injected-defect-investigation.md` (Null-Byte & Breaker) | **PASS 🟢** |
-| 10 | **Mandatory Gates Verification (6/6)** | `mandatory-gates-audit.md` (Concrete Pass/Fail rules) | **PASS 🟢** |
-| 11 | **Live Traffic Simulator & Operations Demo** | `scripts/simulate_traffic.sh`, `demonstration-runbook.md` | **PASS 🟢** |
-| 12 | **Immutable Release Manifest & SBOM** | `docs/review/day20/evidence/final-release-manifest.txt` | **PASS 🟢** |
-| 13 | **Blank Evaluator Scorecard** | `docs/review/day20/evidence/evaluator-scorecard.md` | **PASS 🟢** |
-| 14 | **Honest Retrospective & Future Plan** | `docs/review/day20/evidence/retrospective-and-next-steps.md` | **PASS 🟢** |
+|  #  | Submission Item                              | Verified Location                                             |   Status    |
+| :-: | :------------------------------------------- | :------------------------------------------------------------ | :---------: |
+|  1  | **Dockerized Runtime Stack**                 | `docker-compose.yml`, `Dockerfile.api`, `Dockerfile.worker`   | **PASS 🟢** |
+|  2  | **Automated CI/CD Pipeline**                 | `.github/workflows/ci.yml`, `scripts/ci.sh`                   | **PASS 🟢** |
+|  3  | **Performance Profiling & Load Tests**       | `docs/review/day18/evidence/load-test/`, `pprof` reports      | **PASS 🟢** |
+|  4  | **Automated Backup & Restore Drill**         | `scripts/backup_restore_drill.sh`, `dr-drill/` report         | **PASS 🟢** |
+|  5  | **5 Architectural Decision Records (ADRs)**  | `docs/review/day19/adrs/` (ADR-001 through ADR-005)           | **PASS 🟢** |
+|  6  | **Production Runbooks**                      | `setup-guide.md`, `troubleshooting-guide.md`                  | **PASS 🟢** |
+|  7  | **PRR Zero-Defects Audit**                   | `scripts/prr_audit.sh` (0 open critical findings)             | **PASS 🟢** |
+|  8  | **Tradeoffs & Scalability Defense**          | `system-tradeoffs-and-architecture.md`, `system-design-qa.md` | **PASS 🟢** |
+|  9  | **Diagnosed Injected Defect RCA**            | `injected-defect-investigation.md` (Null-Byte & Breaker)      | **PASS 🟢** |
+| 10  | **Mandatory Gates Verification (6/6)**       | `mandatory-gates-audit.md` (Concrete Pass/Fail rules)         | **PASS 🟢** |
+| 11  | **Live Traffic Simulator & Operations Demo** | `scripts/simulate_traffic.sh`, `demonstration-runbook.md`     | **PASS 🟢** |
+| 12  | **Immutable Release Manifest & SBOM**        | `docs/review/day20/evidence/final-release-manifest.txt`       | **PASS 🟢** |
+| 13  | **Blank Evaluator Scorecard**                | `docs/review/day20/evidence/evaluator-scorecard.md`           | **PASS 🟢** |
+| 14  | **Honest Retrospective & Future Plan**       | `docs/review/day20/evidence/retrospective-and-next-steps.md`  | **PASS 🟢** |
 
 ---
 

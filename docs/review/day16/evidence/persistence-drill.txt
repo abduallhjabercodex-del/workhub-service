@@ -1,0 +1,26 @@
+=== DAY 16 DATA PERSISTENCE DRILL ===
+Timestamp: 2026-09-20T12:47:39Z
+Target Service: workhub_postgres
+Volume Name: workhub-dev_workhub_postgres_data
+
+[Step 1] Seed project record before container teardown:
+INSERT INTO projects (name, owner_user_id) VALUES ('Day 16 Persistence Drill Project', 1) RETURNING id, name, created_at;
+Result: id=1, name='Day 16 Persistence Drill Project'
+
+[Step 2] Complete teardown:
+docker compose down
+Result: All 8 containers and networks removed cleanly.
+
+[Step 3] Fresh recreation:
+docker compose up -d
+Result: All 8 services and networks recreated from cold state.
+
+[Step 4] Query verification:
+docker compose exec postgres psql -U workhub -d workhub_dev -c "SELECT id, name, created_at FROM projects WHERE name='Day 16 Persistence Drill Project';"
+Output:
+ id |               name               |          created_at           
+----+----------------------------------+-------------------------------
+  1 | Day 16 Persistence Drill Project | 2026-09-20 12:46:51.932747+00
+(1 row)
+
+Verdict: PASS - Data survived container destruction and recreation via Named Volume.

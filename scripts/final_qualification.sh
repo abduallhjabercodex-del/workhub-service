@@ -93,7 +93,7 @@ go vet ./internal/... ./cmd/...
 echo -e "  ${GREEN}✓ Go vet static analysis PASSED${NC}"
 
 echo -e "  Running Go race detector across core packages..."
-go test -race -short ./internal/circuitbreaker/... ./internal/bulkhead/... ./internal/auth/... ./internal/worker/... >/dev/null
+go test -race -short ./internal/infrastructure/circuitbreaker/... ./internal/infrastructure/bulkhead/... ./internal/infrastructure/auth/... ./internal/worker/... >/dev/null
 echo -e "  ${GREEN}✓ Race detector PASSED (0 data races detected)${NC}"
 GATES_PASSED=$((GATES_PASSED + 1))
 
@@ -131,9 +131,9 @@ echo -e "\n${BOLD}Building Production Release Binary: ${BIN_OUTPUT}...${NC}"
 CGO_ENABLED=0 go build \
     -tags "netgo,osusergo" \
     -ldflags "-s -w \
-      -X workhub-service/internal/version.Version=${VERSION} \
-      -X workhub-service/internal/version.Commit=${COMMIT_SHA} \
-      -X workhub-service/internal/version.BuildTime=${BUILD_TIME}" \
+      -X workhub-service/internal/infrastructure/version.Version=${VERSION} \
+      -X workhub-service/internal/infrastructure/version.Commit=${COMMIT_SHA} \
+      -X workhub-service/internal/infrastructure/version.BuildTime=${BUILD_TIME}" \
     -o "${BIN_OUTPUT}" ./cmd/server/
 
 BIN_SHA256=$(sha256sum "${BIN_OUTPUT}" | awk '{print $1}')

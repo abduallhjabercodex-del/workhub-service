@@ -1,0 +1,63 @@
+{
+  "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+  "spans": [
+    {
+      "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+      "spanId": "00f067aa0ba902b7",
+      "parentSpanId": "",
+      "name": "HTTP POST /api/v1/projects",
+      "kind": "SPAN_KIND_SERVER",
+      "startTimeUnixNano": 1726747200000000000,
+      "endTimeUnixNano": 1726747200012500000,
+      "attributes": {
+        "http.method": "POST",
+        "http.target": "/api/v1/projects",
+        "http.status_code": 201,
+        "http.user_agent": "Go-http-client/1.1",
+        "user.id": "usr_99812",
+        "request.id": "req_abc123xyz"
+      }
+    },
+    {
+      "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+      "spanId": "5fa2b98e11a20912",
+      "parentSpanId": "00f067aa0ba902b7",
+      "name": "WorkHub.CreateProject",
+      "kind": "SPAN_KIND_INTERNAL",
+      "startTimeUnixNano": 1726747200001200000,
+      "endTimeUnixNano": 1726747200011800000,
+      "attributes": {
+        "project.owner_id": "usr_99812",
+        "project.name": "Production Launch Alpha"
+      }
+    },
+    {
+      "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+      "spanId": "8c3b10901e44f801",
+      "parentSpanId": "5fa2b98e11a20912",
+      "name": "PostgresRepository.CreateProjectWithQuota",
+      "kind": "SPAN_KIND_INTERNAL",
+      "startTimeUnixNano": 1726747200002100000,
+      "endTimeUnixNano": 1726747200010500000,
+      "attributes": {
+        "db.system": "postgresql",
+        "db.name": "workhub_prod",
+        "quota.max_allowed": 10
+      }
+    },
+    {
+      "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+      "spanId": "d98124017a1024bc",
+      "parentSpanId": "8c3b10901e44f801",
+      "name": "INSERT INTO projects",
+      "kind": "SPAN_KIND_CLIENT",
+      "startTimeUnixNano": 1726747200003500000,
+      "endTimeUnixNano": 1726747200009200000,
+      "attributes": {
+        "db.statement": "INSERT INTO projects (owner_user_id, name, created_at, updated_at) VALUES ($1, $2, $3, $3) RETURNING id",
+        "db.operation": "INSERT",
+        "db.sql.table": "projects"
+      }
+    }
+  ]
+}

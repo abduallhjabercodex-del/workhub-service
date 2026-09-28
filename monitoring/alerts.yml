@@ -1,0 +1,57 @@
+groups:
+  - name: workhub_production_alerts
+    rules:
+      # 1. معدل أخطاء مرتفع (SLO Breach)
+      - alert: WorkHubHighErrorRate
+        expr: (sum(rate(http_requests_total{status=~"5.."}[5m])) / sum(rate(http_requests_total[5m]))) * 100 > 1.0
+        for: 2m
+        labels:
+          severity: critical
+          tier: api
+        annotations:
+          summary: "High HTTP 5xx error rate detected on WorkHub API"
+          description: "Error rate is currently {{ $value | printf \"%.2f\" }}% (Threshold > 1.0% over 5m window)."
+
+      # 2. زمن استجابة متدهور (Latency p99)
+      - alert: WorkHubHighLatencyP99
+        expr: histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) > 0.500
+        for: 5m
+        labels:
+          severity: warning
+          tier: api
+        annotations:
+          summary: "API p99 latency exceeded 500ms SLA target"
+          description: "Current p99 latency is {{ $value | printf \"%.3f\" }}s."
+
+      # 3. تشبع مجمع اتصالات قاعدة البيانات (Connection Pool Saturation)
+      - alert: WorkHubDatabasePoolSaturation
+        expr: (workhub_db_pool_acquired_connections / workhub_db_pool_max_connections) * 100 > 85
+        for: 2m
+        labels:
+          severity: warning
+          tier: database
+        annotations:
+          summary: "PostgreSQL connection pool near saturation (>85%)"
+          description: "Current acquired connections: {{ $value | printf \"%.1f\" }}% of pool limit."
+
+      # 4. فتح قاطع الدائرة لكاش Redis (Cache Circuit Breaker Open)
+      - alert: WorkHubCacheCircuitBreakerOpen
+        expr: workhub_cache_circuit_state == 2
+        for: 30s
+        labels:
+          severity: warning
+          tier: cache
+        annotations:
+          summary: "Redis Cache Circuit Breaker is OPEN"
+          description: "Redis is experiencing sustained failures. Cache is gracefully failing open to primary DB."
+
+      # 5. تراكم مهام العامل الخلفي (Worker Job Lag)
+      - alert: WorkHubWorkerQueueLag
+        expr: workhub_worker_active_jobs > 50
+        for: 3m
+        labels:
+          severity: warning
+          tier: worker
+        annotations:
+          summary: "Worker job queue is backing up"
+          description: "Active background jobs: {{ $value }}. Workers may need horizontal scaling."

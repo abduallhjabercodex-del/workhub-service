@@ -1,0 +1,22 @@
+# Command: go test -race -count=1 ./...
+# Executed on: 2026-09-19
+
+?       workhub-service/cmd/server              [no test files]
+ok      workhub-service/internal/auth           6.590s
+ok      workhub-service/internal/bulkhead       1.087s
+ok      workhub-service/internal/cache          6.251s
+ok      workhub-service/internal/circuitbreaker 1.036s
+ok      workhub-service/internal/config         1.027s
+?       workhub-service/internal/domain         [no test files]
+ok      workhub-service/internal/handler        19.656s
+?       workhub-service/internal/logger         [no test files]
+ok      workhub-service/internal/messaging      1.336s
+?       workhub-service/internal/metrics        [no test files]
+ok      workhub-service/internal/middleware     1.043s
+ok      workhub-service/internal/repository     1.048s
+ok      workhub-service/internal/retry          1.152s
+ok      workhub-service/internal/service        12.476s
+?       workhub-service/internal/telemetry      [no test files]
+ok      workhub-service/internal/worker         1.061s
+ok      workhub-service/tests/abuse             23.620s
+ok      workhub-service/tests/dependency        11.528s

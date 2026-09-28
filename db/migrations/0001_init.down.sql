@@ -1,0 +1,12 @@
+-- 0001_init.down.sql
+BEGIN;
+
+DROP TABLE IF EXISTS audit_events  CASCADE;
+DROP TABLE IF EXISTS task_tags     CASCADE;
+DROP TABLE IF EXISTS tags          CASCADE;
+DROP TABLE IF EXISTS tasks         CASCADE;
+DROP TABLE IF EXISTS memberships   CASCADE;
+DROP TABLE IF EXISTS projects      CASCADE;
+DROP TABLE IF EXISTS users         CASCADE;
+
+COMMIT;

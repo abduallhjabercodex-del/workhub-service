@@ -1,0 +1,18 @@
+# Command: git show v0.3.0
+# Content: git show v0.3.0
+
+tag v0.3.0
+Tagger: Abdullah Jaber <abduallh.jaber.codex@gmail.com>
+Date:   Sat Sep 19 16:13:06 2026 +0300
+
+Release v0.3.0 - Day 15 Deliverable: Security & Resilience Review (RBAC, Quotas, Circuit Breaker, Observability)
+
+commit 2b54848179eb31957bdfe189b0ee0de1f41fc944 (HEAD -> main, tag: v0.3.0, tag: v0.2.0)
+Author: Abdullah Jaber <abduallh.jaber.codex@gmail.com>
+Date:   Sat Sep 12 15:14:48 2026 +0300
+
+    docs: update task and project payload names to English in cmd handbook
+
+ docs/cmd.txt  | 4 ++--
+ docs2/cmd.txt | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)

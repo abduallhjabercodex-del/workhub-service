@@ -1,0 +1,235 @@
+File: performance.test
+Build ID: ed54de4a4073a5fe6cce7a4a6bee0747d806f38f
+Type: cpu
+Time: 2026-09-21 16:41:09 +03
+Duration: 2.45s, Total samples = 3.83s (156.15%)
+Showing nodes accounting for 3.41s, 89.03% of 3.83s total
+Dropped 97 nodes (cum <= 0.02s)
+      flat  flat%   sum%        cum   cum%
+     0.54s 14.10% 14.10%      0.54s 14.10%  runtime.futex
+     0.10s  2.61% 16.71%      0.10s  2.61%  runtime.nanotime (inline)
+     0.10s  2.61% 19.32%      0.13s  3.39%  runtime.unlock2
+     0.08s  2.09% 21.41%      0.08s  2.09%  runtime.lock2
+     0.08s  2.09% 23.50%      0.08s  2.09%  runtime.nextFreeFast (inline)
+     0.08s  2.09% 25.59%      0.22s  5.74%  runtime.stealWork
+     0.07s  1.83% 27.42%      0.07s  1.83%  time.runtimeNow
+     0.06s  1.57% 28.98%      0.06s  1.57%  internal/sync.(*Mutex).Unlock (inline)
+     0.05s  1.31% 30.29%      0.14s  3.66%  log/slog.(*handleState).appendString
+     0.05s  1.31% 31.59%      0.08s  2.09%  log/slog.appendEscapedJSONString
+     0.05s  1.31% 32.90%      0.95s 24.80%  net/http.(*timeoutHandler).ServeHTTP
+     0.05s  1.31% 34.20%      0.13s  3.39%  net/textproto.canonicalMIMEHeaderKey
+     0.05s  1.31% 35.51%      0.05s  1.31%  runtime.(*randomEnum).done (inline)
+     0.05s  1.31% 36.81%      0.05s  1.31%  runtime.findfunc
+     0.05s  1.31% 38.12%      0.05s  1.31%  runtime.memclrNoHeapPointers
+     0.05s  1.31% 39.43%      0.05s  1.31%  time.appendInt
+     0.04s  1.04% 40.47%      0.04s  1.04%  internal/sync.(*Mutex).Lock (inline)
+     0.04s  1.04% 41.51%      0.25s  6.53%  log/slog.(*handleState).appendAttr
+     0.04s  1.04% 42.56%      0.06s  1.57%  runtime.(*mspan).writeHeapBitsSmall
+     0.04s  1.04% 43.60%      0.08s  2.09%  runtime.(*unwinder).resolveInternal
+     0.04s  1.04% 44.65%      0.25s  6.53%  runtime.mallocgcSmallScanNoHeader
+     0.04s  1.04% 45.69%      0.04s  1.04%  runtime.pMask.read (inline)
+     0.04s  1.04% 46.74%      0.08s  2.09%  runtime.scanObject
+     0.04s  1.04% 47.78%      0.06s  1.57%  runtime.scanblock
+     0.03s  0.78% 48.56%      0.03s  0.78%  github.com/prometheus/client_golang/prometheus.constrainLabelValues
+     0.03s  0.78% 49.35%      0.03s  0.78%  internal/runtime/atomic.(*Uint32).CompareAndSwap (inline)
+     0.03s  0.78% 50.13%      0.04s  1.04%  log/slog.(*Record).Add
+     0.03s  0.78% 50.91%      0.12s  3.13%  log/slog.(*handleState).appendKey
+     0.03s  0.78% 51.70%      0.03s  0.78%  runtime.cputicks
+     0.03s  0.78% 52.48%      0.03s  0.78%  runtime.memmove
+     0.03s  0.78% 53.26%      0.03s  0.78%  runtime.mutexSampleContention (inline)
+     0.03s  0.78% 54.05%      0.41s 10.70%  runtime.notesleep
+     0.03s  0.78% 54.83%      0.18s  4.70%  runtime.selectgo
+     0.03s  0.78% 55.61%      0.05s  1.31%  runtime.selparkcommit
+     0.03s  0.78% 56.40%      0.04s  1.04%  runtime.stkbucket
+     0.03s  0.78% 57.18%      0.03s  0.78%  runtime.typePointers.next
+     0.03s  0.78% 57.96%      0.03s  0.78%  sync/atomic.(*Int32).Add (inline)
+     0.02s  0.52% 58.49%      0.04s  1.04%  bytes.(*Buffer).Write
+     0.02s  0.52% 59.01%      0.11s  2.87%  github.com/prometheus/client_golang/prometheus.(*CounterVec).GetMetricWithLabelValues (inline)
+     0.02s  0.52% 59.53%      0.02s  0.52%  github.com/prometheus/client_golang/prometheus.(*MetricVec).hashLabelValues
+     0.02s  0.52% 60.05%      0.02s  0.52%  internal/runtime/atomic.(*Uint8).Load (inline)
+     0.02s  0.52% 60.57%      0.02s  0.52%  internal/runtime/maps.ctrlGroup.matchH2 (inline)
+     0.02s  0.52% 61.10%      0.02s  0.52%  internal/strconv.AppendUint
+     0.02s  0.52% 61.62%      0.11s  2.87%  log/slog.(*handleState).appendValue
+     0.02s  0.52% 62.14%      0.02s  0.52%  log/slog.Value.Kind (inline)
+     0.02s  0.52% 62.66%      0.02s  0.52%  log/slog/internal/buffer.(*Buffer).WriteByte (inline)
+     0.02s  0.52% 63.19%      0.02s  0.52%  memeqbody
+     0.02s  0.52% 63.71%      0.02s  0.52%  net/textproto.validHeaderFieldByte (inline)
+     0.02s  0.52% 64.23%      0.02s  0.52%  runtime.(*gcBitsArena).tryAlloc (inline)
+     0.02s  0.52% 64.75%      0.02s  0.52%  runtime.(*guintptr).cas (inline)
+     0.02s  0.52% 65.27%      0.03s  0.78%  runtime.(*inlineUnwinder).srcFunc (inline)
+     0.02s  0.52% 65.80%      0.02s  0.52%  runtime.(*limiterEvent).stop
+     0.02s  0.52% 66.32%      0.02s  0.52%  runtime.(*randomEnum).next (inline)
+     0.02s  0.52% 66.84%      0.05s  1.31%  runtime.(*sweepLocked).sweep
+     0.02s  0.52% 67.36%      0.02s  0.52%  runtime.(*timers).addHeap
+     0.02s  0.52% 67.89%      0.02s  0.52%  runtime.(*timers).wakeTime (inline)
+     0.02s  0.52% 68.41%      0.02s  0.52%  runtime.(*unwinder).finishInternal
+     0.02s  0.52% 68.93%      0.02s  0.52%  runtime.(*unwinder).symPC
+     0.02s  0.52% 69.45%      0.06s  1.57%  runtime.casgstatus
+     0.02s  0.52% 69.97%      0.84s 21.93%  runtime.findRunnable
+     0.02s  0.52% 70.50%      0.05s  1.31%  runtime.makechan
+     0.02s  0.52% 71.02%      0.03s  0.78%  runtime.mallocgcTiny
+     0.02s  0.52% 71.54%      0.02s  0.52%  runtime.pMask.set (inline)
+     0.02s  0.52% 72.06%      0.05s  1.31%  runtime.pcvalue
+     0.02s  0.52% 72.58%      0.02s  0.52%  runtime.pidleput
+     0.02s  0.52% 73.11%      0.02s  0.52%  runtime.releasem (inline)
+     0.02s  0.52% 73.63%      0.02s  0.52%  runtime.runqgrab
+     0.02s  0.52% 74.15%      0.03s  0.78%  runtime.selunlock
+     0.02s  0.52% 74.67%      0.05s  1.31%  runtime.slicebytetostring
+     0.02s  0.52% 75.20%      0.02s  0.52%  runtime.spanHeapBitsRange (inline)
+     0.02s  0.52% 75.72%      0.17s  4.44%  runtime.tracebackPCs
+     0.02s  0.52% 76.24%      0.02s  0.52%  sync/atomic.CompareAndSwapPointer
+     0.02s  0.52% 76.76%      2.09s 54.57%  workhub-service/internal/middleware.Chain.Chain.RequestLog.func3.func4
+     0.02s  0.52% 77.28%      1.21s 31.59%  workhub-service/internal/middleware.Chain.Metrics.func2
+     0.01s  0.26% 77.55%      0.04s  1.04%  context.(*timerCtx).cancel
+     0.01s  0.26% 77.81%      0.15s  3.92%  context.WithDeadlineCause
+     0.01s  0.26% 78.07%      0.04s  1.04%  github.com/prometheus/client_golang/prometheus.findMetricWithLabelValues
+     0.01s  0.26% 78.33%      0.03s  0.78%  github.com/prometheus/client_golang/prometheus.matchLabelValues (inline)
+     0.01s  0.26% 78.59%      0.03s  0.78%  internal/runtime/atomic.(*Bool).Load (inline)
+     0.01s  0.26% 78.85%      0.02s  0.52%  log/slog.(*JSONHandler).Enabled
+     0.01s  0.26% 79.11%      0.74s 19.32%  log/slog.(*Logger).log
+     0.01s  0.26% 79.37%      0.48s 12.53%  log/slog.(*commonHandler).handle
+     0.01s  0.26% 79.63%      0.04s  1.04%  log/slog.(*commonHandler).newHandleState
+     0.01s  0.26% 79.90%      0.28s  7.31%  log/slog.(*handleState).appendNonBuiltIns
+     0.01s  0.26% 80.16%      0.26s  6.79%  log/slog.(*handleState).appendNonBuiltIns.func1 (inline)
+     0.01s  0.26% 80.42%      0.02s  0.52%  log/slog.(*handleState).appendValue.func1
+     0.01s  0.26% 80.68%      0.27s  7.05%  log/slog.Record.Attrs (inline)
+     0.01s  0.26% 80.94%      0.03s  0.78%  log/slog.appendEscapedJSONString.func2 (inline)
+     0.01s  0.26% 81.20%      0.07s  1.83%  net/http.(*Request).WithContext (partial-inline)
+     0.01s  0.26% 81.46%      0.05s  1.31%  net/http.(*timeoutWriter).Write
+     0.01s  0.26% 81.72%      0.03s  0.78%  net/http.(*timeoutWriter).WriteHeader
+     0.01s  0.26% 81.98%      2.40s 62.66%  net/http.HandlerFunc.ServeHTTP
+     0.01s  0.26% 82.25%      0.02s  0.52%  runtime.(*gcControllerState).enlistWorker
+     0.01s  0.26% 82.51%      0.05s  1.31%  runtime.(*mcache).nextFree
+     0.01s  0.26% 82.77%      0.08s  2.09%  runtime.(*timer).modify
+     0.01s  0.26% 83.03%      0.04s  1.04%  runtime.(*timer).unlock (inline)
+     0.01s  0.26% 83.29%      0.14s  3.66%  runtime.(*unwinder).next
+     0.01s  0.26% 83.55%      0.19s  4.96%  runtime.callers.func1
+     0.01s  0.26% 83.81%      0.02s  0.52%  runtime.checkRunqsNoP
+     0.01s  0.26% 84.07%      0.02s  0.52%  runtime.checkTimersNoP
+     0.01s  0.26% 84.33%      0.07s  1.83%  runtime.convTstring
+     0.01s  0.26% 84.60%      0.38s  9.92%  runtime.futexsleep
+     0.01s  0.26% 84.86%      0.34s  8.88%  runtime.mallocgc
+     0.01s  0.26% 85.12%      0.04s  1.04%  runtime.mallocgcSmallNoscan
+     0.01s  0.26% 85.38%      0.03s  0.78%  runtime.mapaccess1_faststr
+     0.01s  0.26% 85.64%      0.15s  3.92%  runtime.markroot
+     0.01s  0.26% 85.90%      0.21s  5.48%  runtime.newobject
+     0.01s  0.26% 86.16%      0.03s  0.78%  runtime.newproc1
+     0.01s  0.26% 86.42%      0.18s  4.70%  runtime.notewakeup
+     0.01s  0.26% 86.68%      0.06s  1.57%  runtime.pidleget
+     0.01s  0.26% 86.95%      0.02s  0.52%  runtime.scanObjectsSmall
+     0.01s  0.26% 87.21%      0.04s  1.04%  runtime.scanSpan
+     0.01s  0.26% 87.47%      0.08s  2.09%  runtime.scanstack
+     0.01s  0.26% 87.73%      0.02s  0.52%  runtime.step
+     0.01s  0.26% 87.99%      0.02s  0.52%  runtime.suspendG
+     0.01s  0.26% 88.25%      0.02s  0.52%  runtime.tryDeferToSpanScan
+     0.01s  0.26% 88.51%      0.02s  0.52%  runtime.wbBufFlush1
+     0.01s  0.26% 88.77%      0.06s  1.57%  time.Time.appendFormatRFC3339
+     0.01s  0.26% 89.03%      2.33s 60.84%  workhub-service/tests/performance.BenchmarkMiddlewareChain
+         0     0% 89.03%      0.02s  0.52%  bytes.(*Buffer).grow
+         0     0% 89.03%      0.03s  0.78%  context.(*cancelCtx).Done
+         0     0% 89.03%      0.02s  0.52%  context.(*cancelCtx).cancel
+         0     0% 89.03%      0.15s  3.92%  context.WithDeadline (inline)
+         0     0% 89.03%      0.04s  1.04%  context.WithDeadlineCause.func3
+         0     0% 89.03%      0.16s  4.18%  context.WithTimeout
+         0     0% 89.03%      0.02s  0.52%  context.WithValue
+         0     0% 89.03%      0.11s  2.87%  github.com/prometheus/client_golang/prometheus.(*CounterVec).WithLabelValues
+         0     0% 89.03%      0.02s  0.52%  github.com/prometheus/client_golang/prometheus.(*GaugeVec).GetMetricWithLabelValues (inline)
+         0     0% 89.03%      0.02s  0.52%  github.com/prometheus/client_golang/prometheus.(*GaugeVec).WithLabelValues
+         0     0% 89.03%      0.12s  3.13%  github.com/prometheus/client_golang/prometheus.(*MetricVec).GetMetricWithLabelValues
+         0     0% 89.03%      0.04s  1.04%  github.com/prometheus/client_golang/prometheus.(*metricMap).getMetricWithHashAndLabelValues
+         0     0% 89.03%      0.07s  1.83%  github.com/prometheus/client_golang/prometheus.(*metricMap).getOrCreateMetricWithLabelValues
+         0     0% 89.03%      0.02s  0.52%  internal/strconv.AppendInt
+         0     0% 89.03%      0.03s  0.78%  internal/strconv.FormatInt
+         0     0% 89.03%      0.03s  0.78%  internal/strconv.Itoa (inline)
+         0     0% 89.03%      0.48s 12.53%  log/slog.(*JSONHandler).Handle
+         0     0% 89.03%      0.02s  0.52%  log/slog.(*Logger).Enabled
+         0     0% 89.03%      0.74s 19.32%  log/slog.(*Logger).InfoContext
+         0     0% 89.03%      0.07s  1.83%  log/slog.(*handleState).appendTime
+         0     0% 89.03%      0.07s  1.83%  log/slog.appendJSONTime
+         0     0% 89.03%      0.07s  1.83%  log/slog.appendJSONValue
+         0     0% 89.03%      0.03s  0.78%  log/slog/internal/buffer.New (inline)
+         0     0% 89.03%      0.13s  3.39%  net/http.(*timeoutHandler).ServeHTTP.func1
+         0     0% 89.03%      0.07s  1.83%  net/http.Header.Get
+         0     0% 89.03%      0.08s  2.09%  net/http.Header.Set
+         0     0% 89.03%      0.13s  3.39%  net/textproto.CanonicalMIMEHeaderKey
+         0     0% 89.03%      0.07s  1.83%  net/textproto.MIMEHeader.Get
+         0     0% 89.03%      0.08s  2.09%  net/textproto.MIMEHeader.Set (inline)
+         0     0% 89.03%      0.04s  1.04%  runtime.(*mcache).refill
+         0     0% 89.03%      0.04s  1.04%  runtime.(*mcentral).cacheSpan
+         0     0% 89.03%      0.04s  1.04%  runtime.(*mcentral).grow
+         0     0% 89.03%      0.03s  0.78%  runtime.(*mspan).initHeapBits
+         0     0% 89.03%      0.04s  1.04%  runtime.(*timer).maybeAdd
+         0     0% 89.03%      0.04s  1.04%  runtime.(*timers).check
+         0     0% 89.03%      0.02s  0.52%  runtime.(*waitq).dequeue (inline)
+         0     0% 89.03%      0.18s  4.70%  runtime.Callers (inline)
+         0     0% 89.03%      0.02s  0.52%  runtime.acquirep
+         0     0% 89.03%      0.02s  0.52%  runtime.acquirepNoTrace
+         0     0% 89.03%      0.07s  1.83%  runtime.bgsweep
+         0     0% 89.03%      0.05s  1.31%  runtime.blockevent
+         0     0% 89.03%      0.19s  4.96%  runtime.callers
+         0     0% 89.03%      0.05s  1.31%  runtime.closechan
+         0     0% 89.03%      0.03s  0.78%  runtime.execute
+         0     0% 89.03%      0.04s  1.04%  runtime.funcspdelta (inline)
+         0     0% 89.03%      0.17s  4.44%  runtime.futexwakeup
+         0     0% 89.03%      0.31s  8.09%  runtime.gcBgMarkWorker
+         0     0% 89.03%      0.30s  7.83%  runtime.gcBgMarkWorker.func2
+         0     0% 89.03%      0.30s  7.83%  runtime.gcDrain
+         0     0% 89.03%      0.26s  6.79%  runtime.gcDrainMarkWorkerDedicated (inline)
+         0     0% 89.03%      0.04s  1.04%  runtime.gcDrainMarkWorkerIdle (inline)
+         0     0% 89.03%      0.03s  0.78%  runtime.gdestroy
+         0     0% 89.03%      0.13s  3.39%  runtime.goexit0
+         0     0% 89.03%      0.08s  2.09%  runtime.gopreempt_m (inline)
+         0     0% 89.03%      0.08s  2.09%  runtime.goschedImpl
+         0     0% 89.03%      0.06s  1.57%  runtime.heapSetTypeNoHeader (inline)
+         0     0% 89.03%      0.02s  0.52%  runtime.isSystemGoroutine
+         0     0% 89.03%      0.08s  2.09%  runtime.lock (inline)
+         0     0% 89.03%      0.08s  2.09%  runtime.lockWithRank (inline)
+         0     0% 89.03%      0.41s 10.70%  runtime.mPark (inline)
+         0     0% 89.03%      0.02s  0.52%  runtime.makeslice
+         0     0% 89.03%      0.10s  2.61%  runtime.markroot.func1
+         0     0% 89.03%      0.04s  1.04%  runtime.markrootBlock
+         0     0% 89.03%      0.88s 22.98%  runtime.mcall
+         0     0% 89.03%      0.08s  2.09%  runtime.morestack
+         0     0% 89.03%      0.02s  0.52%  runtime.newMarkBits
+         0     0% 89.03%      0.32s  8.36%  runtime.newproc
+         0     0% 89.03%      0.32s  8.36%  runtime.newproc.func1
+         0     0% 89.03%      0.08s  2.09%  runtime.newstack
+         0     0% 89.03%      0.75s 19.58%  runtime.park_m
+         0     0% 89.03%      0.06s  1.57%  runtime.pidlegetSpinning
+         0     0% 89.03%      0.02s  0.52%  runtime.preemptM (inline)
+         0     0% 89.03%      0.02s  0.52%  runtime.runqput
+         0     0% 89.03%      0.02s  0.52%  runtime.runqsteal
+         0     0% 89.03%      0.05s  1.31%  runtime.saveBlockEventStack
+         0     0% 89.03%      0.05s  1.31%  runtime.saveblockevent
+         0     0% 89.03%      0.03s  0.78%  runtime.scanframeworker
+         0     0% 89.03%      0.88s 22.98%  runtime.schedule
+         0     0% 89.03%      0.03s  0.78%  runtime.sellock
+         0     0% 89.03%      0.02s  0.52%  runtime.signalM
+         0     0% 89.03%      0.21s  5.48%  runtime.startm
+         0     0% 89.03%      0.47s 12.27%  runtime.stopm
+         0     0% 89.03%      0.06s  1.57%  runtime.sweepone
+         0     0% 89.03%      0.87s 22.72%  runtime.systemstack
+         0     0% 89.03%      0.13s  3.39%  runtime.unlock (inline)
+         0     0% 89.03%      0.13s  3.39%  runtime.unlockWithRank (inline)
+         0     0% 89.03%      0.28s  7.31%  runtime.wakep
+         0     0% 89.03%      0.02s  0.52%  runtime.wbBufFlush
+         0     0% 89.03%      0.02s  0.52%  runtime.wbBufFlush.func1
+         0     0% 89.03%      0.02s  0.52%  strconv.AppendInt (inline)
+         0     0% 89.03%      0.03s  0.78%  strconv.Itoa
+         0     0% 89.03%      0.04s  1.04%  sync.(*Mutex).Lock (inline)
+         0     0% 89.03%      0.06s  1.57%  sync.(*Mutex).Unlock (partial-inline)
+         0     0% 89.03%      0.03s  0.78%  sync.(*Pool).Get
+         0     0% 89.03%      0.03s  0.78%  sync.(*RWMutex).RLock (inline)
+         0     0% 89.03%      0.02s  0.52%  sync/atomic.(*Value).Store
+         0     0% 89.03%      2.33s 60.84%  testing.(*B).launch
+         0     0% 89.03%      2.33s 60.84%  testing.(*B).runN
+         0     0% 89.03%      0.09s  2.35%  time.AfterFunc
+         0     0% 89.03%      0.07s  1.83%  time.Now
+         0     0% 89.03%      0.03s  0.78%  time.Since
+         0     0% 89.03%      0.06s  1.57%  time.Time.AppendFormat
+         0     0% 89.03%      0.03s  0.78%  time.appendNano
+         0     0% 89.03%      0.08s  2.09%  time.newTimer
+         0     0% 89.03%      0.04s  1.04%  time.runtimeNano
+         0     0% 89.03%      2.31s 60.31%  workhub-service/internal/middleware.Chain.Chain.Recovery.func6.func7
+         0     0% 89.03%      2.31s 60.31%  workhub-service/internal/middleware.Chain.RequestID.func5
+         0     0% 89.03%      0.08s  2.09%  workhub-service/tests/performance.BenchmarkMiddlewareChain.func1

@@ -1,0 +1,285 @@
+name: workhub-dev
+services:
+  api:
+    build:
+      context: /home/abdullah-jaber/Desktop/WorkHup/workhub-dev
+      dockerfile: Dockerfile.api
+    cap_drop:
+      - ALL
+    container_name: workhub_api
+    depends_on:
+      broker:
+        condition: service_healthy
+        required: true
+      migrate:
+        condition: service_completed_successfully
+        required: true
+      postgres:
+        condition: service_healthy
+        required: true
+      redis:
+        condition: service_healthy
+        required: true
+    deploy:
+      resources:
+        limits:
+          cpus: 0.5
+          memory: "268435456"
+    environment:
+      ACCESS_TOKEN_TTL: 15m
+      ALLOWED_ORIGINS: http://localhost:3000,http://localhost:8080,http://localhost:8081,http://localhost:8090,http://127.0.0.1:8080
+      APP_ENV: development
+      BCRYPT_COST: "12"
+      BROKER_URL: redis://broker:6379/0
+      DATABASE_URL: postgres://workhub:workhub_secure_password_123!@postgres:5432/workhub_dev?sslmode=disable
+      HOST: 0.0.0.0
+      JWT_SECRET: workhub-super-secret-key-that-is-at-least-32-bytes-long!
+      LOG_LEVEL: info
+      MAX_IN_FLIGHT: "1000"
+      PORT: "8080"
+      POSTGRES_DB: workhub_dev
+      POSTGRES_PASSWORD: workhub_secure_password_123!
+      POSTGRES_USER: workhub
+      REDIS_CACHE_TTL: 60s
+      REDIS_URL: redis://redis:6379/0
+      REFRESH_TOKEN_TTL: 168h
+      REQUEST_TIMEOUT: 15s
+      TRUSTED_PROXIES: 127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+      WORKER_CONCURRENCY: "3"
+      WORKER_HEALTH_PORT: "9091"
+      WORKER_QUEUE_SIZE: "1000"
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --no-verbose
+        - --tries=1
+        - --timeout=2
+        - --spider
+        - http://localhost:8080/ready
+      timeout: 3s
+      interval: 15s
+      retries: 3
+      start_period: 20s
+    image: workhub-api:local
+    init: true
+    networks:
+      workhub-net: null
+    read_only: true
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 20s
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+  broker:
+    command:
+      - redis-server
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+      - --loglevel
+      - notice
+    container_name: workhub_broker
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      timeout: 3s
+      interval: 10s
+      retries: 5
+      start_period: 10s
+    image: redis:7.4-alpine
+    networks:
+      workhub-net: null
+    restart: unless-stopped
+    stop_grace_period: 15s
+  migrate:
+    container_name: workhub_migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: true
+    entrypoint:
+      - /bin/sh
+      - /run_migrations.sh
+    environment:
+      PGDATABASE: workhub_dev
+      PGHOST: postgres
+      PGPASSWORD: workhub_secure_password_123!
+      PGPORT: "5432"
+      PGUSER: workhub
+    image: postgres:16.4-alpine3.20
+    networks:
+      workhub-net: null
+    restart: "no"
+    volumes:
+      - type: bind
+        source: /home/abdullah-jaber/Desktop/WorkHup/workhub-dev/db/migrations
+        target: /migrations
+        read_only: true
+        bind:
+          create_host_path: true
+      - type: bind
+        source: /home/abdullah-jaber/Desktop/WorkHup/workhub-dev/db/migrations/run_migrations.sh
+        target: /run_migrations.sh
+        read_only: true
+        bind:
+          create_host_path: true
+  postgres:
+    container_name: workhub_postgres
+    environment:
+      POSTGRES_DB: workhub_dev
+      POSTGRES_PASSWORD: workhub_secure_password_123!
+      POSTGRES_USER: workhub
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U workhub -d workhub_dev
+      timeout: 5s
+      interval: 10s
+      retries: 5
+      start_period: 30s
+    image: postgres:16.4-alpine3.20
+    networks:
+      workhub-net: null
+    restart: unless-stopped
+    stop_grace_period: 1m0s
+    volumes:
+      - type: volume
+        source: workhub_postgres_data
+        target: /var/lib/postgresql/data
+        volume: {}
+  proxy:
+    container_name: workhub_proxy
+    depends_on:
+      api:
+        condition: service_healthy
+        required: true
+    image: nginx:alpine
+    networks:
+      workhub-net: null
+    ports:
+      - mode: ingress
+        target: 80
+        published: "8090"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /home/abdullah-jaber/Desktop/WorkHup/workhub-dev/nginx/nginx.conf
+        target: /etc/nginx/nginx.conf
+        read_only: true
+        bind:
+          create_host_path: true
+  redis:
+    command:
+      - redis-server
+      - --save
+      - "60"
+      - "1"
+      - --loglevel
+      - notice
+    container_name: workhub_redis
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      timeout: 3s
+      interval: 10s
+      retries: 5
+      start_period: 10s
+    image: redis:7.4-alpine
+    networks:
+      workhub-net: null
+    restart: unless-stopped
+    stop_grace_period: 15s
+    volumes:
+      - type: volume
+        source: workhub_redis_data
+        target: /data
+        volume: {}
+  worker:
+    build:
+      context: /home/abdullah-jaber/Desktop/WorkHup/workhub-dev
+      dockerfile: Dockerfile.worker
+    cap_drop:
+      - ALL
+    container_name: workhub_worker
+    depends_on:
+      broker:
+        condition: service_healthy
+        required: true
+      migrate:
+        condition: service_completed_successfully
+        required: true
+      postgres:
+        condition: service_healthy
+        required: true
+      redis:
+        condition: service_healthy
+        required: true
+    deploy:
+      resources:
+        limits:
+          cpus: 0.5
+          memory: "134217728"
+    environment:
+      ACCESS_TOKEN_TTL: 15m
+      ALLOWED_ORIGINS: http://localhost:3000,http://localhost:8080,http://localhost:8081,http://localhost:8090,http://127.0.0.1:8080
+      APP_ENV: development
+      BCRYPT_COST: "12"
+      BROKER_URL: redis://broker:6379/0
+      DATABASE_URL: postgres://workhub:workhub_secure_password_123!@postgres:5432/workhub_dev?sslmode=disable
+      HOST: 0.0.0.0
+      JWT_SECRET: workhub-super-secret-key-that-is-at-least-32-bytes-long!
+      LOG_LEVEL: info
+      MAX_IN_FLIGHT: "1000"
+      PORT: "8080"
+      POSTGRES_DB: workhub_dev
+      POSTGRES_PASSWORD: workhub_secure_password_123!
+      POSTGRES_USER: workhub
+      REDIS_CACHE_TTL: 60s
+      REDIS_URL: redis://redis:6379/0
+      REFRESH_TOKEN_TTL: 168h
+      REQUEST_TIMEOUT: 15s
+      TRUSTED_PROXIES: 127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+      WORKER_CONCURRENCY: "3"
+      WORKER_HEALTH_PORT: "9091"
+      WORKER_QUEUE_SIZE: "1000"
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --no-verbose
+        - --tries=1
+        - --timeout=2
+        - --spider
+        - http://localhost:9091/healthz
+      timeout: 5s
+      interval: 30s
+      retries: 3
+      start_period: 30s
+    image: workhub-worker:local
+    init: true
+    networks:
+      workhub-net: null
+    read_only: true
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 30s
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+networks:
+  workhub-net:
+    name: workhub-dev_workhub-net
+    driver: bridge
+volumes:
+  workhub_postgres_data:
+    name: workhub-dev_workhub_postgres_data
+  workhub_redis_data:
+    name: workhub-dev_workhub_redis_data

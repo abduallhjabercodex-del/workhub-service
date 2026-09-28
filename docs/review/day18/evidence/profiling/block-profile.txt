@@ -1,0 +1,28 @@
+File: performance.test
+Build ID: ed54de4a4073a5fe6cce7a4a6bee0747d806f38f
+Type: delay
+Time: 2026-09-21 16:41:11 +03
+Showing nodes accounting for 2659.17ms, 100% of 2659.17ms total
+Dropped 13 nodes (cum <= 13.30ms)
+      flat  flat%   sum%        cum   cum%
+ 2453.79ms 92.28% 92.28%  2453.79ms 92.28%  runtime.chanrecv1
+  205.38ms  7.72%   100%   205.38ms  7.72%  runtime.selectgo
+         0     0%   100%  2453.79ms 92.28%  main.main
+         0     0%   100%   205.38ms  7.72%  net/http.(*timeoutHandler).ServeHTTP
+         0     0%   100%   205.38ms  7.72%  net/http.HandlerFunc.ServeHTTP
+         0     0%   100%  2453.79ms 92.28%  runtime.main
+         0     0%   100%  2451.64ms 92.20%  testing.(*B).Run
+         0     0%   100%  2450.26ms 92.14%  testing.(*B).doBench
+         0     0%   100%   205.38ms  7.72%  testing.(*B).doBench.gowrap1
+         0     0%   100%   205.38ms  7.72%  testing.(*B).launch
+         0     0%   100%  2450.26ms 92.14%  testing.(*B).run
+         0     0%   100%  2657.03ms 99.92%  testing.(*B).runN
+         0     0%   100%  2453.79ms 92.28%  testing.(*M).Run
+         0     0%   100%  2450.26ms 92.14%  testing.(*benchState).processBench
+         0     0%   100%  2451.65ms 92.20%  testing.runBenchmarks
+         0     0%   100%  2451.64ms 92.20%  testing.runBenchmarks.func1
+         0     0%   100%   205.38ms  7.72%  workhub-service/internal/middleware.Chain.Chain.Recovery.func6.func7
+         0     0%   100%   205.38ms  7.72%  workhub-service/internal/middleware.Chain.Chain.RequestLog.func3.func4
+         0     0%   100%   205.38ms  7.72%  workhub-service/internal/middleware.Chain.Metrics.func2
+         0     0%   100%   205.38ms  7.72%  workhub-service/internal/middleware.Chain.RequestID.func5
+         0     0%   100%   205.38ms  7.72%  workhub-service/tests/performance.BenchmarkMiddlewareChain

@@ -1,0 +1,5 @@
+=== IMMUTABLE CONTAINER ARTIFACTS ===
+Commit Tag: 972e1e1
+API Image ID: sha256:6bd0bea453b5dc97a4df2731ad3bc9bbb66aa005e248de9fca52d8741ffba4e4
+Worker Image ID: sha256:9c1947f2aaac4b7a65c1e0c8fb703d77a513ba4808d01587b34f790d14e49ac5
+Generated at: 2026-09-28T13:59:21Z

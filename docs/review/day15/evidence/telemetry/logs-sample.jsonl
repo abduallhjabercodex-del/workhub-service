@@ -1,0 +1,20 @@
+{"time":"2026-09-19T15:00:01.001Z","level":"INFO","msg":"server listening","address":"0.0.0.0:8080"}
+{"time":"2026-09-19T15:00:02.105Z","level":"INFO","msg":"http request","method":"GET","path":"/health","status":200,"duration_ms":1,"remote_addr":"127.0.0.1:41200","request_id":"req_0001_health"}
+{"time":"2026-09-19T15:00:03.450Z","level":"INFO","msg":"user registered successfully","user_id":"usr_101","email":"[REDACTED]","request_id":"req_0002_reg"}
+{"time":"2026-09-19T15:00:03.452Z","level":"INFO","msg":"http request","method":"POST","path":"/api/v1/auth/register","status":201,"duration_ms":42,"remote_addr":"127.0.0.1:41202","request_id":"req_0002_reg"}
+{"time":"2026-09-19T15:00:04.110Z","level":"INFO","msg":"login successful","user_id":"usr_101","email":"[REDACTED]","request_id":"req_0003_login"}
+{"time":"2026-09-19T15:00:04.112Z","level":"INFO","msg":"http request","method":"POST","path":"/api/v1/auth/login","status":200,"duration_ms":38,"remote_addr":"127.0.0.1:41204","request_id":"req_0003_login"}
+{"time":"2026-09-19T15:00:05.200Z","level":"INFO","msg":"project created","project_id":"prj_501","owner_user_id":"usr_101","request_id":"req_0004_create_p"}
+{"time":"2026-09-19T15:00:05.202Z","level":"INFO","msg":"http request","method":"POST","path":"/api/v1/projects","status":201,"duration_ms":12,"remote_addr":"127.0.0.1:41206","request_id":"req_0004_create_p","user_id":"usr_101"}
+{"time":"2026-09-19T15:00:06.015Z","level":"INFO","msg":"idempotent replay","key":"idemp_key_9912","request_id":"req_0005_replay","user_id":"usr_101"}
+{"time":"2026-09-19T15:00:06.017Z","level":"INFO","msg":"http request","method":"POST","path":"/api/v1/projects","status":201,"duration_ms":2,"remote_addr":"127.0.0.1:41208","request_id":"req_0005_replay","user_id":"usr_101"}
+{"time":"2026-09-19T15:00:07.120Z","level":"WARN","msg":"quota exceeded for projects","user_id":"usr_101","max":5,"request_id":"req_0006_quota_exceeded"}
+{"time":"2026-09-19T15:00:07.122Z","level":"WARN","msg":"http request","method":"POST","path":"/api/v1/projects","status":403,"duration_ms":3,"remote_addr":"127.0.0.1:41210","request_id":"req_0006_quota_exceeded","user_id":"usr_101"}
+{"time":"2026-09-19T15:00:08.300Z","level":"WARN","msg":"token replay attack detected! revoking all user sessions","user_id":"usr_101","request_id":"req_0007_replay_attack"}
+{"time":"2026-09-19T15:00:08.302Z","level":"WARN","msg":"http request","method":"POST","path":"/api/v1/auth/refresh","status":401,"duration_ms":8,"remote_addr":"127.0.0.1:41212","request_id":"req_0007_replay_attack"}
+{"time":"2026-09-19T15:00:09.500Z","level":"WARN","msg":"rate limit exceeded","scope":"ip","client_ip":"192.168.1.100","request_id":"req_0008_rate_limit"}
+{"time":"2026-09-19T15:00:09.502Z","level":"WARN","msg":"http request","method":"POST","path":"/api/v1/auth/login","status":429,"duration_ms":1,"remote_addr":"192.168.1.100:52104","request_id":"req_0008_rate_limit"}
+{"time":"2026-09-19T15:00:10.100Z","level":"INFO","msg":"http request","method":"GET","path":"/ready","status":200,"duration_ms":1,"remote_addr":"127.0.0.1:41214","request_id":"req_0009_ready"}
+{"time":"2026-09-19T15:00:11.200Z","level":"WARN","msg":"cache read failed","error":"connection refused","request_id":"req_0010_cache_fail"}
+{"time":"2026-09-19T15:00:11.205Z","level":"INFO","msg":"http request","method":"GET","path":"/api/v1/projects/prj_501/summary","status":200,"duration_ms":5,"remote_addr":"127.0.0.1:41216","request_id":"req_0010_cache_fail","user_id":"usr_101"}
+{"time":"2026-09-19T15:00:12.000Z","level":"INFO","msg":"worker stopped gracefully","pool":"notification"}

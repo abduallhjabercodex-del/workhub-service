@@ -1,0 +1,11 @@
+goos: linux
+goarch: amd64
+pkg: workhub-service/tests/performance
+cpu: 12th Gen Intel(R) Core(TM) i7-12800HX
+BenchmarkRequestID_Legacy-24        	32843509	        75.00 ns/op	      32 B/op	       1 allocs/op
+BenchmarkRequestID_Optimized-24     	166738645	        14.63 ns/op	       0 B/op	       0 allocs/op
+BenchmarkMiddlewareChain-24         	  460945	      4539 ns/op	    1803 B/op	      27 allocs/op
+BenchmarkHealthEndpoint-24          	 7422657	       359.8 ns/op	      88 B/op	       3 allocs/op
+BenchmarkRequestIDFromContext-24    	 5831137	       389.4 ns/op	     464 B/op	       7 allocs/op
+PASS
+ok  	workhub-service/tests/performance	14.280s

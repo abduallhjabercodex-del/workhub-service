@@ -13,14 +13,14 @@ The 6 Mandatory Gates represent non-negotiable architectural and operational saf
 
 Below is the verified status matrix with explicit, measurable Pass/Fail criteria and exact validation commands:
 
-| Gate | Title | Objective | Measurable Pass Rule | Status |
-|:---:|---|---|---|:---:|
-| **Gate 1** | **Secrets & Credential Hygiene** | Zero committed secrets, bcrypt cost 12, log redaction | Git commit secret count == 0; Log token count == 0 | **PASS 🟢** |
-| **Gate 2** | **Authorization & Zero IDOR** | Strict RBAC hierarchy & tenant boundary isolation | `forbidden_test.go` exit code == 0 (0 cross-tenant leaks) | **PASS 🟢** |
-| **Gate 3** | **Clean Migrations & DR Drill** | Reproducible DB schema & verified backup/restore | Schema clean run == 0; `backup_restore_drill.sh` exit == 0 | **PASS 🟢** |
-| **Gate 4** | **Concurrency & Code Quality** | Race-free execution, clean vet, standard formatting | `go test -race` exit code == 0 (0 data races) | **PASS 🟢** |
-| **Gate 5** | **Operational Lifecycle** | Accurate readiness probes & zero-drop graceful shutdown | Liveness 200, Ready ping-backed, SIGTERM drain == 0 drops | **PASS 🟢** |
-| **Gate 6** | **Zero PRR Critical Defects** | No crash loops, no silent data loss, 0 PRR defects | `scripts/prr_audit.sh` open critical defects == 0 | **PASS 🟢** |
+|    Gate    | Title                            | Objective                                               | Measurable Pass Rule                                       |   Status    |
+| :--------: | :------------------------------- | :------------------------------------------------------ | :--------------------------------------------------------- | :---------: |
+| **Gate 1** | **Secrets & Credential Hygiene** | Zero committed secrets, bcrypt cost 12, log redaction   | Git commit secret count == 0; Log token count == 0         | **PASS 🟢** |
+| **Gate 2** | **Authorization & Zero IDOR**    | Strict RBAC hierarchy & tenant boundary isolation       | `forbidden_test.go` exit code == 0 (0 cross-tenant leaks)  | **PASS 🟢** |
+| **Gate 3** | **Clean Migrations & DR Drill**  | Reproducible DB schema & verified backup/restore        | Schema clean run == 0; `backup_restore_drill.sh` exit == 0 | **PASS 🟢** |
+| **Gate 4** | **Concurrency & Code Quality**   | Race-free execution, clean vet, standard formatting     | `go test -race` exit code == 0 (0 data races)              | **PASS 🟢** |
+| **Gate 5** | **Operational Lifecycle**        | Accurate readiness probes & zero-drop graceful shutdown | Liveness 200, Ready ping-backed, SIGTERM drain == 0 drops  | **PASS 🟢** |
+| **Gate 6** | **Zero PRR Critical Defects**    | No crash loops, no silent data loss, 0 PRR defects      | `scripts/prr_audit.sh` open critical defects == 0          | **PASS 🟢** |
 
 ---
 

@@ -1,0 +1,42 @@
+=== DAY 16 FAILURE & RESILIENCE DRILL ===
+Timestamp: 2026-09-20T13:00:40Z
+
+[Step 1] Stop downstream PostgreSQL dependency:
+Command: docker compose stop postgres
+Result: Container workhub_postgres stopped cleanly.
+
+[Step 2] Probe API readiness through Nginx Reverse Proxy:
+Command: curl -i http://localhost:8090/ready
+Output:
+HTTP/1.1 503 Service Unavailable
+Server: nginx
+Date: Sun, 20 Sep 2026 13:00:40 GMT
+Content-Type: application/json
+Content-Length: 202
+Connection: keep-alive
+Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+X-Frame-Options: DENY
+X-Content-Type-Options: nosniff
+Referrer-Policy: strict-origin-when-cross-origin
+Content-Security-Policy: default-src 'self'; frame-ancestors 'none';
+Permissions-Policy: geolocation=(), microphone=(), camera=()
+
+{"status":"unavailable","time":"2026-09-20T13:00:40Z","error":"failed to connect to `user=workhub database=workhub_dev`: hostname resolving error: lookup postgres on 127.0.0.11:53: server misbehaving"}
+
+[Step 3] Restore PostgreSQL dependency:
+Command: docker compose start postgres
+Result: Container workhub_postgres started.
+
+[Step 4] Verify automatic recovery:
+Command: curl -i http://localhost:8090/ready
+Output:
+HTTP/1.1 200 OK
+Server: nginx
+Date: Sun, 20 Sep 2026 13:01:09 GMT
+Content-Type: application/json
+Content-Length: 46
+Connection: keep-alive
+
+{"status":"ok","time":"2026-09-20T13:01:09Z"}
+
+Verdict: PASS - API accurately reports 503 Service Unavailable during dependency outage and self-heals back to 200 OK upon restoration without process restarts.

@@ -1,0 +1,9 @@
+--- LOAD TEST RUN [2026-09-21T13:37:38Z] MODE: after ---
+Total Requests: 2500
+Total Duration: 352.953172ms
+Throughput (RPS): 7083.09 req/sec
+Latency p50: 2.323478ms
+Latency p95: 62.865587ms (Threshold < 500ms)
+Latency p99: 77.000534ms
+Error Rate: 0.00% (Threshold < 1.0%)
+✓ THRESHOLDS VERIFIED: p95 < 500ms and error rate < 1.0%

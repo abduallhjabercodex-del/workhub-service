@@ -1,0 +1,176 @@
+services:
+  postgres:
+    image: postgres:16.4-alpine3.20
+    container_name: workhub_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-workhub}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+      POSTGRES_DB: ${POSTGRES_DB:-workhub_dev}
+    volumes:
+      - workhub_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-workhub} -d ${POSTGRES_DB:-workhub_dev}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    stop_grace_period: 60s
+    networks:
+      - workhub-net
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: workhub_redis
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel notice
+    volumes:
+      - workhub_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    stop_grace_period: 15s
+    networks:
+      - workhub-net
+
+  broker:
+    image: redis:7.4-alpine
+    container_name: workhub_broker
+    restart: unless-stopped
+    command: redis-server --save "" --appendonly no --loglevel notice
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    stop_grace_period: 15s
+    networks:
+      - workhub-net
+
+  migrate:
+    image: postgres:16.4-alpine3.20
+    container_name: workhub_migrate
+    restart: "no"
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: ${POSTGRES_USER:-workhub}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?required}
+      PGDATABASE: ${POSTGRES_DB:-workhub_dev}
+    volumes:
+      - ./db/migrations:/migrations:ro
+      - ./db/migrations/run_migrations.sh:/run_migrations.sh:ro
+    entrypoint: ["/bin/sh", "/run_migrations.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - workhub-net
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    image: workhub-api:local
+    container_name: workhub_api
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      broker:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    init: true
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--timeout=2", "--spider", "http://localhost:8080/ready"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+    stop_grace_period: 20s
+    networks:
+      - workhub-net
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    image: workhub-worker:local
+    container_name: workhub_worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      broker:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    init: true
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    deploy:
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 128M
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--timeout=2", "--spider", "http://localhost:9091/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    stop_grace_period: 30s
+    networks:
+      - workhub-net
+
+  proxy:
+    image: nginx:alpine
+    container_name: workhub_proxy
+    restart: unless-stopped
+    ports:
+      - "${PROXY_PORT:-8090}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - workhub-net
+
+networks:
+  workhub-net:
+    driver: bridge
+
+volumes:
+  workhub_postgres_data:
+  workhub_redis_data:
