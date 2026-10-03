@@ -9,15 +9,15 @@ import (
 )
 
 // =============================================================================
-// الخاصية 1: Rate Limiter لا يسمح أبداً بأكثر من الـ capacity
-// مهما كان عدد الطلبات
+// Property 1: Rate Limiter never permits more than capacity
+// regardless of request burst volume
 // =============================================================================
 func TestProperty_RateLimiterNeverExceedsCapacity(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		capacity := rapid.IntRange(1, 20).Draw(t, "capacity")
 		requests := rapid.IntRange(capacity, capacity*3).Draw(t, "requests")
 
-		limiter := NewRateLimiter(capacity, time.Minute) // refill بطيء جداً
+		limiter := NewRateLimiter(capacity, time.Minute) // very slow refill
 		key := "test-user"
 
 		allowed := 0
@@ -27,7 +27,7 @@ func TestProperty_RateLimiterNeverExceedsCapacity(t *testing.T) {
 			}
 		}
 
-		// الخاصية: عدد الطلبات المقبولة لا يتجاوز الـ capacity أبداً
+		// Invariant: allowed requests must never exceed capacity
 		if allowed > capacity {
 			t.Fatalf("allowed=%d exceeded capacity=%d (requests=%d)", allowed, capacity, requests)
 		}
@@ -35,8 +35,8 @@ func TestProperty_RateLimiterNeverExceedsCapacity(t *testing.T) {
 }
 
 // =============================================================================
-// الخاصية 2: عزل المستخدمين — كل مستخدم له حصته المستقلة
-// طلبات user-A لا تؤثر على حصة user-B
+// Property 2: User Isolation — each user maintains independent quota
+// Requests by user-A do not affect user-B quota
 // =============================================================================
 func TestProperty_RateLimiterUsersAreIsolated(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
@@ -45,12 +45,12 @@ func TestProperty_RateLimiterUsersAreIsolated(t *testing.T) {
 
 		limiter := NewRateLimiter(capacity, time.Minute)
 
-		// استنفد حصة user-0 كاملاً
+		// Exhaust user:0 quota entirely
 		for i := 0; i < capacity; i++ {
 			limiter.Allow("user:0")
 		}
 
-		// الخاصية: المستخدمون الآخرون لا يزالون يملكون حصتهم كاملة
+		// Invariant: other users still have full capacity
 		for u := 1; u < numUsers; u++ {
 			key := fmt.Sprintf("user:%d", u)
 			if !limiter.Allow(key) {
@@ -61,7 +61,7 @@ func TestProperty_RateLimiterUsersAreIsolated(t *testing.T) {
 }
 
 // =============================================================================
-// الخاصية 3: Remaining لا يكون أبداً أكبر من capacity
+// Property 3: Remaining tokens never exceed capacity
 // =============================================================================
 func TestProperty_RemainingNeverExceedsCapacity(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
@@ -73,7 +73,7 @@ func TestProperty_RemainingNeverExceedsCapacity(t *testing.T) {
 		for i := 0; i < requests; i++ {
 			_, remaining, cap, _, _ := limiter.AllowWithDetails("user:test")
 
-			// الخاصية: remaining لا تتجاوز capacity أبداً
+			// Invariant: remaining never exceeds capacity and is non-negative
 			if remaining > cap {
 				t.Fatalf("remaining=%d > capacity=%d after %d requests", remaining, cap, i+1)
 			}
@@ -85,14 +85,14 @@ func TestProperty_RemainingNeverExceedsCapacity(t *testing.T) {
 }
 
 // =============================================================================
-// الخاصية 4: الطلب الأول يُقبل دائماً (إذا كان الـ limiter جديداً)
+// Property 4: First request is always allowed for new limiter keys
 // =============================================================================
 func TestProperty_FirstRequestAlwaysAllowed(t *testing.T) {
 	rapid.Check(t, func(t *rapid.T) {
 		capacity := rapid.IntRange(1, 100).Draw(t, "capacity")
 		key := rapid.StringMatching(`[a-z]{1,20}`).Draw(t, "key")
 
-		// كل مستخدم جديد يجب أن يُقبل في طلبه الأول
+		// Any new client key must be accepted on first request
 		limiter := NewRateLimiter(capacity, time.Minute)
 
 		if !limiter.Allow(key) {

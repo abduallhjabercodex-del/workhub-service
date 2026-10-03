@@ -68,8 +68,8 @@ var (
 	)
 )
 
-// registerGaugeOnce يضمن أن GaugeFunc واحد لكل (metric, labels)
-// ويسجّل تحذيرًا بدل الفشل الصامت.
+// registerGaugeOnce ensures only a single GaugeFunc per (metric, labels)
+// and logs a warning instead of failing silently.
 var registeredGauges sync.Map
 
 func registerGaugeOnce(key string, opts prometheus.GaugeOpts, f func() float64) {
@@ -117,12 +117,8 @@ var (
 		[]string{"op"},
 	)
 
-	// CacheCircuitState — Gauge بسيط (بلا labels).
+	// CacheCircuitState — Simple gauge (no labels).
 	// 0=closed, 1=half_open, 2=open
-	//
-	// ⚠️ التنبيهات في deploy/prometheus/alerts.yml ولوحات Grafana
-	// كانت تستخدم اسمًا بديلًا `workhub_cache_circuit_state_value`.
-	// يجب تحديثها إلى `workhub_cache_circuit_state`.
 	CacheCircuitState = promauto.NewGauge(
 		prometheus.GaugeOpts{
 			Namespace: "workhub",
@@ -132,7 +128,7 @@ var (
 	)
 )
 
-// UpdateCacheCircuitState — يُستدعى من circuit breaker عند تغيّر الحالة.
+// UpdateCacheCircuitState is called by the circuit breaker whenever state changes.
 func UpdateCacheCircuitState(state int) {
 	CacheCircuitState.Set(float64(state))
 }
@@ -246,15 +242,15 @@ var (
 // Helper
 // ============================================================
 
-// ObserveDBQuery — يبدأ مؤقتًا ويعيد دالة defer.
+// ObserveDBQuery starts a timer and returns a deferrable callback.
 //
-// الاستخدام:
+// Usage:
 //
 //	stop := metrics.ObserveDBQuery("SELECT", "projects")
 //	row, err := r.pool.Query(ctx, ...)
 //	stop(&err)
 //
-// ملاحظة: التوقيع يستخدم *error لكي يقرأ القيمة النهائية بعد تنفيذ الاستعلام.
+// Note: Accepts *error to evaluate the final error state after query completion.
 func ObserveDBQuery(operation, table string) func(err *error) {
 	start := time.Now()
 	return func(err *error) {

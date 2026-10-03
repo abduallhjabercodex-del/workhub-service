@@ -15,22 +15,20 @@ import (
 )
 
 const (
-	// stateProcessing — قيمة مخزّنة في مفتاح الحالة أثناء التنفيذ.
+	// stateProcessing — Sentinel value stored in key during execution.
 	stateProcessing = "processing"
 
-	// defaultTTL — مدة تخزين النتيجة النهائية.
+	// defaultTTL — Retention period for cached idempotent responses.
 	defaultTTL = 24 * time.Hour
 
-	// processingTTL — مدة اعتبار "قيد التنفيذ" صالحة.
-	// إذا تجاوزتها دون نتيجة نهائية → الطلب فشل/عُلّق.
+	// processingTTL — Max duration for "processing" state lock before considering request hung/timed out.
 	processingTTL = 30 * time.Second
 
-	// maxBodySize — حد أقصى لحجم الـ response body المخزَّن.
-	// إذا تجاوز → لا نخزّن (fail-open، نعتمد على idempotency المستقبلي).
+	// maxBodySize — Maximum cached response body size (256 KB). Responses above this fail open.
 	maxBodySize = 256 * 1024 // 256 KB
 )
 
-// sensitiveHeaders — لا تُخزَّن (أو تُخزَّن فارغة).
+// sensitiveHeaders are stripped and excluded from cached idempotency responses.
 var sensitiveHeaders = map[string]struct{}{
 	"set-cookie":         {},
 	"authorization":      {},
@@ -38,7 +36,7 @@ var sensitiveHeaders = map[string]struct{}{
 	"proxy-authenticate": {},
 }
 
-// IdempotencyResponse — النتيجة المخزَّنة.
+// IdempotencyResponse holds the cached HTTP response representation.
 type IdempotencyResponse struct {
 	StatusCode  int                 `json:"status_code"`
 	Headers     map[string][]string `json:"headers"`
@@ -46,28 +44,28 @@ type IdempotencyResponse struct {
 	Fingerprint string              `json:"fingerprint"` // sha256(request-body)
 }
 
-// ErrFingerprintMismatch — نفس المفتاح بجسم مختلف.
+// ErrFingerprintMismatch indicates the idempotency key was reused with a conflicting payload body.
 var ErrFingerprintMismatch = errors.New("idempotency key reused with different request body")
 
-// ErrInProgress — نفس المفتاح قيد التنفيذ الآن.
+// ErrInProgress indicates another request with the same idempotency key is currently processing.
 var ErrInProgress = errors.New("idempotency key is currently in progress")
 
-// IdempotencyStore — عقد التخزين.
+// IdempotencyStore defines storage contract for idempotent requests.
 type IdempotencyStore interface {
-	// Get يقرأ النتيجة المخزّنة، إن وُجدت.
+	// Get retrieves cached response if available.
 	Get(ctx context.Context, userID, key, fingerprint string) (*IdempotencyResponse, error)
 
-	// Begin يحاول حجز المفتاح للتنفيذ الحصري.
-	// - يعيد (true, nil) إذا نجح الحجز → على المستدعي تنفيذ العملية.
-	// - يعيد (false, nil) إذا كانت النتيجة مخزّنة بالفعل → استخدم Get.
-	// - يعيد (false, ErrInProgress) إذا كان طلب آخر قيد التنفيذ.
-	// - يعيد (false, ErrFingerprintMismatch) إذا نفس المفتاح بجسم مختلف.
+	// Begin attempts atomic key acquisition for exclusive execution.
+	// - returns (true, nil) if key acquired -> caller must process operation.
+	// - returns (false, nil) if response already cached -> use Get.
+	// - returns (false, ErrInProgress) if another request is currently executing.
+	// - returns (false, ErrFingerprintMismatch) if key reused with different body.
 	Begin(ctx context.Context, userID, key, fingerprint string) (bool, error)
 
-	// Save يخزّن النتيجة النهائية.
+	// Save persists final response and releases lock.
 	Save(ctx context.Context, userID, key string, resp *IdempotencyResponse) error
 
-	// Fail يُحرّر الحجز عند فشل العملية (يسمح بإعادة المحاولة).
+	// Fail releases lock on operation failure allowing retry.
 	Fail(ctx context.Context, userID, key string) error
 }
 
@@ -91,7 +89,7 @@ func (s *RedisIdempotencyStore) stateKey(userID, key string) string {
 	return fmt.Sprintf("workhub:idempotency:%s:%s:state", userID, key)
 }
 
-// Fingerprint يحسب sha256 من body.
+// Fingerprint computes sha256 checksum of request body.
 func Fingerprint(body []byte) string {
 	h := sha256.Sum256(body)
 	return hex.EncodeToString(h[:])
@@ -121,7 +119,7 @@ func (s *RedisIdempotencyStore) Get(
 		return nil, fmt.Errorf("unmarshal: %w", err)
 	}
 
-	// فحص الـ fingerprint: نفس المفتاح يجب أن يحمل نفس الـ body.
+	// Verify fingerprint: identical key must carry matching payload body
 	if resp.Fingerprint != "" && resp.Fingerprint != fingerprint {
 		metrics.IdempotencyRequestsTotal.WithLabelValues("mismatch").Inc()
 		return nil, ErrFingerprintMismatch
@@ -132,12 +130,12 @@ func (s *RedisIdempotencyStore) Get(
 	return &resp, nil
 }
 
-// Begin — حجز ذرّي للمفتاح عبر SET NX.
+// Begin attempts atomic key reservation via SET NX.
 func (s *RedisIdempotencyStore) Begin(
 	ctx context.Context,
 	userID, key, fingerprint string,
 ) (bool, error) {
-	// 1) حاول حجز حالة "processing" (ذرّي).
+	// 1) Attempt atomic acquisition of "processing" state
 	start := time.Now()
 	ok, err := s.client.SetNX(ctx, s.stateKey(userID, key), stateProcessing, processingTTL).Result()
 	metrics.CacheOperationDuration.WithLabelValues("idempotency_begin").Observe(time.Since(start).Seconds())
@@ -148,33 +146,33 @@ func (s *RedisIdempotencyStore) Begin(
 	}
 
 	if ok {
-		// نجح الحجز — نحن أول من ينفّذ.
+		// Acquisition succeeded: this request is first to execute
 		metrics.CacheOperationsTotal.WithLabelValues("idempotency_begin", "ok").Inc()
 		return true, nil
 	}
 
-	// 2) الحجز فشل — هناك طلب آخر. هل هو قيد التنفيذ أم انتهى؟
+	// 2) Acquisition failed: check if request is in-flight or completed
 	state, err := s.client.Get(ctx, s.stateKey(userID, key)).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
 		return false, fmt.Errorf("redis get state: %w", err)
 	}
 
 	if state == stateProcessing {
-		// طلب آخر قيد التنفيذ.
+		// Request currently in progress
 		return false, ErrInProgress
 	}
 
-	// 3) لا state + لا resp → بدأ للتو ثم فشل. حاول مجددًا.
+	// 3) Neither active state nor response found: possible crash; retry fetch
 	resp, err := s.Get(ctx, userID, key, fingerprint)
 	if err != nil {
 		return false, err
 	}
 	if resp != nil {
-		// النتيجة موجودة → استخدمها.
+		// Cached result found: replay
 		return false, nil
 	}
 
-	// حاول الحجز مرة أخرى (race نادر).
+	// Retry acquisition in rare race condition
 	ok, err = s.client.SetNX(ctx, s.stateKey(userID, key), stateProcessing, processingTTL).Result()
 	if err != nil {
 		return false, fmt.Errorf("redis setnx retry: %w", err)
@@ -190,13 +188,13 @@ func (s *RedisIdempotencyStore) Save(
 	userID, key string,
 	resp *IdempotencyResponse,
 ) error {
-	// 1) حجم الـ body: إذا تجاوز الحد → لا نخزّن النتيجة (fail-open).
+	// 1) Body size limit: do not cache oversized payloads (fail open)
 	if len(resp.Body) > maxBodySize {
 		_ = s.Fail(ctx, userID, key)
 		return nil
 	}
 
-	// 2) فلترة الـ headers الحساسة.
+	// 2) Filter sensitive headers
 	safeHeaders := make(map[string][]string, len(resp.Headers))
 	for k, v := range resp.Headers {
 		if _, sensitive := sensitiveHeaders[normalizeHeader(k)]; sensitive {
@@ -206,7 +204,7 @@ func (s *RedisIdempotencyStore) Save(
 	}
 	resp.Headers = safeHeaders
 
-	// 3) تسلسل + تخزين.
+	// 3) Serialize and persist
 	data, err := json.Marshal(resp)
 	if err != nil {
 		_ = s.Fail(ctx, userID, key)
@@ -215,7 +213,7 @@ func (s *RedisIdempotencyStore) Save(
 
 	pipe := s.client.Pipeline()
 	pipe.Set(ctx, s.respKey(userID, key), data, s.ttl)
-	pipe.Del(ctx, s.stateKey(userID, key)) // حرّر حالة "processing"
+	pipe.Del(ctx, s.stateKey(userID, key)) // Release "processing" state
 	start := time.Now()
 	_, err = pipe.Exec(ctx)
 	metrics.CacheOperationDuration.WithLabelValues("idempotency_save").Observe(time.Since(start).Seconds())
@@ -228,7 +226,7 @@ func (s *RedisIdempotencyStore) Save(
 	return nil
 }
 
-// Fail — يُحرّر الحجز عند فشل العملية (5xx, error).
+// Fail releases the processing lock on operation failure (5xx or error).
 func (s *RedisIdempotencyStore) Fail(ctx context.Context, userID, key string) error {
 	if err := s.client.Del(ctx, s.stateKey(userID, key)).Err(); err != nil {
 		return fmt.Errorf("redis del: %w", err)

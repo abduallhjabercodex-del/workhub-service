@@ -20,25 +20,25 @@ const (
 	StateHalfOpen State = "half-open"
 )
 
-// Config — إعدادات الـ breaker.
+// Config holds circuit breaker parameters.
 type Config struct {
-	// Threshold — عدد الفشل المتتالية قبل الفتح.
+	// Threshold is the number of consecutive failures before tripping to Open.
 	// default: 3
 	Threshold int
 
-	// Cooldown — مدة البقاء في Open قبل محاولة HalfOpen.
+	// Cooldown is the duration to remain in Open before attempting HalfOpen.
 	// default: 10s
 	Cooldown time.Duration
 
-	// HalfOpenMax — عدد النجاح المتتالية للإغلاق من HalfOpen.
+	// HalfOpenMax is the number of consecutive successes to close from HalfOpen.
 	// default: 3
 	HalfOpenMax int
 
-	// Name — label للـ metrics. إذا فارغ → "default".
+	// Name is a label for telemetry and logs. If empty -> "default".
 	Name string
 
-	// DisableTimer — يُعطّل الجدولة التلقائية للـ cooldown.
-	// مفيد في الاختبارات التي تتحكم في الزمن يدويًا.
+	// DisableTimer disables automatic cooldown scheduling.
+	// Useful for deterministic testing where time is advanced manually.
 	DisableTimer bool
 }
 
@@ -61,16 +61,16 @@ type Breaker struct {
 	successes   int
 	lastFailure time.Time
 
-	// timeNow قابلة للاستبدال في الاختبارات.
+	// timeNow can be substituted in tests for deterministic time.
 	timeNow func() time.Time
 
-	// timer للجدولة التلقائية للـ cooldown (قد يكون nil).
+	// timer for automatic cooldown scheduling (may be nil).
 	timer *time.Timer
 
-	// disableTimer يُعطّل الجدولة (للاختبارات).
+	// disableTimer disables automatic timer scheduling (for tests).
 	disableTimer bool
 
-	// closed يمنع جدولة timers جديدة بعد Close().
+	// closed prevents scheduling new timers after Close().
 	closed bool
 }
 
@@ -182,7 +182,7 @@ func (b *Breaker) scheduleCooldownTimerLocked() {
 	if b.disableTimer || b.closed {
 		return
 	}
-	// أوقف أي timer سابق قبل جدولة جديد.
+	// Stop any existing timer before scheduling a new one.
 	if b.timer != nil {
 		b.timer.Stop()
 		b.timer = nil
@@ -204,7 +204,7 @@ func (b *Breaker) stopTimerLocked() {
 	}
 }
 
-// checkStateLocked — يُستدعى دائمًا تحت القفل.
+// checkStateLocked must always be called while holding mu.Lock.
 func (b *Breaker) checkStateLocked() {
 	if b.state != StateOpen {
 		return
@@ -217,12 +217,12 @@ func (b *Breaker) checkStateLocked() {
 	}
 }
 
-// setMetric — للاستخدام الداخلي من New (بدون قفل، لا أحد يقرأ بعد).
+// setMetric is used internally by New (lock-free since instance is unshared).
 func (b *Breaker) setMetric(state int) {
 	metrics.UpdateCacheCircuitState(state)
 }
 
-// setMetricLocked — يُستدعى تحت القفل.
+// setMetricLocked updates Prometheus metric while holding mu.Lock.
 func (b *Breaker) setMetricLocked() {
 	var v int
 	switch b.state {
@@ -243,7 +243,7 @@ func (b *Breaker) Name() string {
 	return b.name
 }
 
-// Close — يوقف الـ timer ويحرّر الموارد. آمن للاستدعاء المتكرر.
+// Close cancels active timers and releases resources. Safe for multiple invocations.
 func (b *Breaker) Close() {
 	b.mu.Lock()
 	defer b.mu.Unlock()

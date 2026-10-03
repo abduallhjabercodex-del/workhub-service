@@ -14,7 +14,7 @@ func testEvent() domain.Event {
 	return domain.Event{ID: "evt-1", Type: "task.created", AggregateType: "task", AggregateID: "7", ProjectID: "1", TaskID: "7", OccurredAt: time.Now().UTC()}
 }
 
-// TestNotificationWorkerRetriesAndDeduplicates يختبر إعادة المحاولة تلقائياً عند فشل الإشعار وتثبيط الرسائل المكررة (Deduplication) لمنع تكرار الإرسال.
+// TestNotificationWorkerRetriesAndDeduplicates tests automatic retries on notification failure and message deduplication to prevent duplicate delivery.
 func TestNotificationWorkerRetriesAndDeduplicates(t *testing.T) {
 	broker := messaging.NewBroker(3)
 	store := NewMemoryDeliveryStore()
@@ -37,7 +37,7 @@ func TestNotificationWorkerRetriesAndDeduplicates(t *testing.T) {
 	}
 }
 
-// TestNotificationWorkerMovesFailedEventToDeadLetter يختبر نقل الأحداث التي تكرر فشل معالجتها بعد استنفاد محاولات إعادة الإرسال إلى قائمة الرسائل الميتة (Dead Letters).
+// TestNotificationWorkerMovesFailedEventToDeadLetter tests routing events to the dead-letter queue after exhausting retry attempts.
 func TestNotificationWorkerMovesFailedEventToDeadLetter(t *testing.T) {
 	broker := messaging.NewBroker(2)
 	store := NewMemoryDeliveryStore()
@@ -55,7 +55,7 @@ func TestNotificationWorkerMovesFailedEventToDeadLetter(t *testing.T) {
 	}
 }
 
-// TestNotificationWorkerIntegrationConsumesPublishedEvent يختبر التكامل الكلي لعامل الإشعارات (Worker) في استهلاك الأحداث المنشورة على ناقل الأحداث ومعالجتها فورياً.
+// TestNotificationWorkerIntegrationConsumesPublishedEvent tests end-to-end integration of the notification worker consuming published broker events in real time.
 func TestNotificationWorkerIntegrationConsumesPublishedEvent(t *testing.T) {
 	broker := messaging.NewBroker(3)
 	store := NewMemoryDeliveryStore()

@@ -1,6 +1,11 @@
 package domain
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
+
+// Core Domain Entities and Aggregates.
 
 type Project struct {
 	ID        string    `json:"id"`
@@ -10,12 +15,13 @@ type Project struct {
 }
 
 type Task struct {
-	ID        string    `json:"id"`
-	ProjectID string    `json:"projectId"`
-	CreatedBy string    `json:"createdBy"` // ← جديد
-	Title     string    `json:"title"`
-	Status    string    `json:"status"`
-	CreatedAt time.Time `json:"createdAt"`
+	ID         string    `json:"id"`
+	ProjectID  string    `json:"projectId"`
+	CreatedBy  string    `json:"createdBy"`
+	AssigneeID *string   `json:"assigneeId,omitempty"`
+	Title      string    `json:"title"`
+	Status     string    `json:"status"`
+	CreatedAt  time.Time `json:"createdAt"`
 }
 
 type ProjectSummary struct {
@@ -37,26 +43,30 @@ type Event struct {
 	CorrelationID string    `json:"correlationId,omitempty"`
 }
 
+type OutboxRecord struct {
+	ID            int64      `json:"id"`
+	EventID       string     `json:"eventId"`
+	EventType     string     `json:"eventType"`
+	AggregateType string     `json:"aggregateType"`
+	AggregateID   string     `json:"aggregateId"`
+	Payload       []byte     `json:"payload"`
+	Attempts      int        `json:"attempts"`
+	AvailableAt   time.Time  `json:"availableAt"`
+	PublishedAt   *time.Time `json:"publishedAt,omitempty"`
+	LastError     *string    `json:"lastError,omitempty"`
+	CreatedAt     time.Time  `json:"createdAt"`
+}
+
 type AuditEvent struct {
-	ActorUserID string
-	ProjectID   string
-	TaskID      string
-	EventType   string
-	Payload     []byte
-	CreatedAt   time.Time
-}
-
-type CreateProjectInput struct {
-	Name string `json:"name"`
-}
-
-type CreateTaskInput struct {
-	Title string `json:"title"`
-}
-
-type UpdateTaskInput struct {
-	Title  *string `json:"title"`
-	Status *string `json:"status"`
+	ID               string          `json:"id"`
+	ActorUserID      string          `json:"actorUserId"`
+	ActorDisplayName string          `json:"actorDisplayName,omitempty"`
+	ActorEmail       string          `json:"actorEmail,omitempty"`
+	ProjectID        string          `json:"projectId"`
+	TaskID           string          `json:"taskId,omitempty"`
+	EventType        string          `json:"eventType"`
+	Payload          json.RawMessage `json:"payload"`
+	CreatedAt        time.Time       `json:"createdAt"`
 }
 
 type User struct {
@@ -71,31 +81,6 @@ type AuthUser struct {
 	ID          string `json:"id"`
 	Email       string `json:"email"`
 	DisplayName string `json:"displayName"`
-}
-
-type RegisterInput struct {
-	Email       string `json:"email"`
-	DisplayName string `json:"displayName"`
-	Password    string `json:"password"`
-}
-
-type LoginInput struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-}
-
-type RefreshInput struct {
-	RefreshToken string `json:"refreshToken"`
-}
-
-type LogoutInput struct {
-	RefreshToken string `json:"refreshToken"`
-}
-
-type AuthResponse struct {
-	AccessToken  string   `json:"accessToken"`
-	RefreshToken string   `json:"refreshToken"`
-	User         AuthUser `json:"user"`
 }
 
 type RefreshTokenSession struct {
@@ -115,11 +100,6 @@ type Member struct {
 	DisplayName string    `json:"displayName,omitempty"`
 	Role        Role      `json:"role"`
 	JoinedAt    time.Time `json:"joinedAt"`
-}
-
-type AddMemberInput struct {
-	UserID string `json:"userId"`
-	Role   Role   `json:"role"`
 }
 
 type UserQuota struct {

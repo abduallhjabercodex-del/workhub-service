@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -13,6 +14,9 @@ import (
 )
 
 func (s *WorkHub) CreateProject(ctx context.Context, ownerUserID string, in domain.CreateProjectInput) (domain.Project, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	ctx, span := telemetry.Tracer().Start(ctx, "WorkHub.CreateProject")
 	defer span.End()
 
@@ -38,9 +42,18 @@ func (s *WorkHub) CreateProject(ctx context.Context, ownerUserID string, in doma
 		return domain.Project{}, err
 	}
 
-	// ← حذفنا AddProjectMember: الـ Repository يُدرج العضوية داخل نفس Transaction
-
 	slog.InfoContext(ctx, "project created", "project_id", p.ID, "owner_user_id", ownerUserID)
+
+	payloadBytes, _ := json.Marshal(map[string]interface{}{
+		"project_name": p.Name,
+	})
+	s.recordAudit(ctx, domain.AuditEvent{
+		ActorUserID: ownerUserID,
+		ProjectID:   p.ID,
+		EventType:   "project.created",
+		Payload:     payloadBytes,
+		CreatedAt:   p.CreatedAt,
+	})
 
 	if s.publisher != nil {
 		event := domain.Event{
@@ -61,8 +74,17 @@ func (s *WorkHub) CreateProject(ctx context.Context, ownerUserID string, in doma
 }
 
 func (s *WorkHub) ListProjects(ctx context.Context, actorUserID, q, sortBy string, limit, offset int) ([]domain.Project, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, span := telemetry.Tracer().Start(ctx, "WorkHub.ListProjects")
+	defer span.End()
+
 	if actorUserID == "" {
 		return nil, ErrUnauthorized
+	}
+	if limit < 0 || offset < 0 {
+		return nil, ErrInvalidInput
 	}
 	items, err := s.projects.ListProjects(ctx, actorUserID, q, sortBy, limit, offset)
 	if err != nil {
@@ -71,7 +93,29 @@ func (s *WorkHub) ListProjects(ctx context.Context, actorUserID, q, sortBy strin
 	return items, nil
 }
 
+func (s *WorkHub) CountUserProjects(ctx context.Context, actorUserID string) (int, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, span := telemetry.Tracer().Start(ctx, "WorkHub.CountUserProjects")
+	defer span.End()
+
+	if actorUserID == "" {
+		return 0, ErrUnauthorized
+	}
+	return s.projects.CountUserProjects(ctx, actorUserID)
+}
+
 func (s *WorkHub) GetProject(ctx context.Context, actorUserID, projectID string) (domain.Project, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, span := telemetry.Tracer().Start(ctx, "WorkHub.GetProject")
+	defer span.End()
+
+	if strings.TrimSpace(projectID) == "" {
+		return domain.Project{}, ErrProjectNotFound
+	}
 	if _, err := s.CheckAccess(ctx, actorUserID, projectID); err != nil {
 		return domain.Project{}, err
 	}
@@ -86,6 +130,15 @@ func (s *WorkHub) GetProject(ctx context.Context, actorUserID, projectID string)
 }
 
 func (s *WorkHub) DeleteProject(ctx context.Context, actorUserID, projectID string) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, span := telemetry.Tracer().Start(ctx, "WorkHub.DeleteProject")
+	defer span.End()
+
+	if strings.TrimSpace(projectID) == "" {
+		return ErrProjectNotFound
+	}
 	if _, err := s.CheckAccess(ctx, actorUserID, projectID, domain.RoleOwner); err != nil {
 		return err
 	}
@@ -96,10 +149,35 @@ func (s *WorkHub) DeleteProject(ctx context.Context, actorUserID, projectID stri
 		return fmt.Errorf("delete project: %w", err)
 	}
 	s.invalidateSummary(ctx, projectID)
+
+	if s.publisher != nil {
+		event := domain.Event{
+			ID:            fmt.Sprintf("project-deleted-%s", projectID),
+			Type:          "project.deleted",
+			AggregateType: "project",
+			AggregateID:   projectID,
+			ProjectID:     projectID,
+			OccurredAt:    s.now().UTC(),
+			CorrelationID: middleware.RequestIDFromContext(ctx),
+		}
+		if pubErr := s.publisher.Publish(ctx, event); pubErr != nil {
+			slog.ErrorContext(ctx, "publish project.deleted failed",
+				"error", pubErr, "project_id", projectID)
+		}
+	}
 	return nil
 }
 
 func (s *WorkHub) AddProjectMember(ctx context.Context, actorUserID, projectID, targetUserID string, role domain.Role) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, span := telemetry.Tracer().Start(ctx, "WorkHub.AddProjectMember")
+	defer span.End()
+
+	if strings.TrimSpace(targetUserID) == "" || strings.TrimSpace(projectID) == "" {
+		return ErrInvalidInput
+	}
 	switch role {
 	case domain.RoleOwner, domain.RoleAdmin, domain.RoleMember, domain.RoleViewer:
 	default:
@@ -109,7 +187,6 @@ func (s *WorkHub) AddProjectMember(ctx context.Context, actorUserID, projectID, 
 		return ErrStorage
 	}
 
-	// ← استخدام العضو من CheckAccess بدل استدعاء مكرر
 	actorMember, err := s.CheckAccess(ctx, actorUserID, projectID, domain.RoleAdmin)
 	if err != nil {
 		return err
@@ -118,7 +195,6 @@ func (s *WorkHub) AddProjectMember(ctx context.Context, actorUserID, projectID, 
 		return ErrForbidden
 	}
 
-	// ← معالجة خطأ GetProject
 	proj, err := s.projects.GetProject(ctx, projectID)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
@@ -144,6 +220,18 @@ func (s *WorkHub) AddProjectMember(ctx context.Context, actorUserID, projectID, 
 		"project_id", projectID, "target_user_id", targetUserID,
 		"role", role, "actor_user_id", actorUserID)
 
+	memberPayload, _ := json.Marshal(map[string]interface{}{
+		"target_user_id": targetUserID,
+		"role":           string(role),
+	})
+	s.recordAudit(ctx, domain.AuditEvent{
+		ActorUserID: actorUserID,
+		ProjectID:   projectID,
+		EventType:   "member.added",
+		Payload:     memberPayload,
+		CreatedAt:   s.now().UTC(),
+	})
+
 	if s.publisher != nil {
 		event := domain.Event{
 			ID:            fmt.Sprintf("member-added-%s-%s", projectID, targetUserID),
@@ -154,12 +242,24 @@ func (s *WorkHub) AddProjectMember(ctx context.Context, actorUserID, projectID, 
 			OccurredAt:    s.now().UTC(),
 			CorrelationID: middleware.RequestIDFromContext(ctx),
 		}
-		_ = s.publisher.Publish(ctx, event)
+		if pubErr := s.publisher.Publish(ctx, event); pubErr != nil {
+			slog.ErrorContext(ctx, "publish member.added failed",
+				"error", pubErr, "project_id", projectID, "user_id", targetUserID)
+		}
 	}
 	return nil
 }
 
 func (s *WorkHub) ListProjectMembers(ctx context.Context, actorUserID, projectID string) ([]domain.Member, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, span := telemetry.Tracer().Start(ctx, "WorkHub.ListProjectMembers")
+	defer span.End()
+
+	if strings.TrimSpace(projectID) == "" {
+		return nil, ErrProjectNotFound
+	}
 	if s.memberships == nil {
 		return nil, ErrStorage
 	}
@@ -170,6 +270,15 @@ func (s *WorkHub) ListProjectMembers(ctx context.Context, actorUserID, projectID
 }
 
 func (s *WorkHub) RemoveProjectMember(ctx context.Context, actorUserID, projectID, targetUserID string) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, span := telemetry.Tracer().Start(ctx, "WorkHub.RemoveProjectMember")
+	defer span.End()
+
+	if strings.TrimSpace(targetUserID) == "" || strings.TrimSpace(projectID) == "" {
+		return ErrInvalidInput
+	}
 	if s.memberships == nil {
 		return ErrStorage
 	}
@@ -177,7 +286,6 @@ func (s *WorkHub) RemoveProjectMember(ctx context.Context, actorUserID, projectI
 		return err
 	}
 
-	// ← استخدام الدالة الذرّية الجديدة
 	if err := s.memberships.RemoveProjectMemberSafely(ctx, projectID, targetUserID); err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			return ErrNotFound
@@ -193,6 +301,17 @@ func (s *WorkHub) RemoveProjectMember(ctx context.Context, actorUserID, projectI
 		"project_id", projectID, "target_user_id", targetUserID,
 		"actor_user_id", actorUserID)
 
+	removePayload, _ := json.Marshal(map[string]interface{}{
+		"target_user_id": targetUserID,
+	})
+	s.recordAudit(ctx, domain.AuditEvent{
+		ActorUserID: actorUserID,
+		ProjectID:   projectID,
+		EventType:   "member.removed",
+		Payload:     removePayload,
+		CreatedAt:   s.now().UTC(),
+	})
+
 	if s.publisher != nil {
 		event := domain.Event{
 			ID:            fmt.Sprintf("member-removed-%s-%s", projectID, targetUserID),
@@ -203,12 +322,24 @@ func (s *WorkHub) RemoveProjectMember(ctx context.Context, actorUserID, projectI
 			OccurredAt:    s.now().UTC(),
 			CorrelationID: middleware.RequestIDFromContext(ctx),
 		}
-		_ = s.publisher.Publish(ctx, event)
+		if pubErr := s.publisher.Publish(ctx, event); pubErr != nil {
+			slog.ErrorContext(ctx, "publish member.removed failed",
+				"error", pubErr, "project_id", projectID, "user_id", targetUserID)
+		}
 	}
 	return nil
 }
 
 func (s *WorkHub) ProjectSummary(ctx context.Context, actorUserID, projectID string) (domain.ProjectSummary, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, span := telemetry.Tracer().Start(ctx, "WorkHub.ProjectSummary")
+	defer span.End()
+
+	if strings.TrimSpace(projectID) == "" {
+		return domain.ProjectSummary{}, ErrProjectNotFound
+	}
 	if s.summaries == nil {
 		return domain.ProjectSummary{}, ErrStorage
 	}

@@ -22,9 +22,12 @@ func testAPI() (*API, http.Handler, string) {
 	deps := service.Deps{
 		Projects:    repo,
 		Tasks:       repo,
+		Summaries:   repo,
 		Users:       repo,
 		Auth:        repo,
 		Memberships: repo,
+		Quotas:      repo,
+		Pinger:      repo,
 		Config: service.AuthConfig{
 			JWTSecret:       testSecret,
 			AccessTokenTTL:  15 * time.Minute,
@@ -48,7 +51,7 @@ func testAPI() (*API, http.Handler, string) {
 	return api, handler, user.AccessToken
 }
 
-// TestProjectAndTaskFlow يختبر سير العمل التكاملي لإنشاء مشروع جديد، ثم إضافة مهمة فرعية وتحديث حالتها إلى (done) بنجاح عبر الواجهة البرمجية HTTP.
+// TestProjectAndTaskFlow verifies the end-to-end integration workflow of creating a new project, adding a task, and updating its status to (done) via the HTTP API.
 func TestProjectAndTaskFlow(t *testing.T) {
 	_, api, token := testAPI()
 
@@ -100,7 +103,7 @@ func TestProjectAndTaskFlow(t *testing.T) {
 	}
 }
 
-// TestValidationErrorEnvelope يختبر إرجاع غلاف الأخطاء الموحد (Error Envelope) برموز الاستجابة المناسبة (400 Bad Request) عند تقديم بيانات غير صالحة.
+// TestValidationErrorEnvelope tests returning the unified error envelope with appropriate status codes (400 Bad Request) when invalid data is provided.
 func TestValidationErrorEnvelope(t *testing.T) {
 	_, api, token := testAPI()
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/projects", bytes.NewBufferString(`{"name":""}`))
@@ -116,7 +119,7 @@ func TestValidationErrorEnvelope(t *testing.T) {
 	}
 }
 
-// TestHealthAndReadinessEndpoints يختبر نقاط النهاية الخاصة بفحص السلامة وحالة جاهزية النظام (/health و /ready) للتأكد من إرجاع حالة 200 OK.
+// TestHealthAndReadinessEndpoints tests the health check and readiness check endpoints (/health and /ready) to ensure 200 OK is returned.
 func TestHealthAndReadinessEndpoints(t *testing.T) {
 	rawAPI, api, _ := testAPI()
 

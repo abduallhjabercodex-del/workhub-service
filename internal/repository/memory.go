@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -20,10 +22,14 @@ type MemoryRepository struct {
 	tokens        map[string]domain.RefreshTokenSession
 	members       map[string]map[string]domain.Member // projectID -> userID -> Member
 	userQuotas    map[string]domain.UserQuota
+	auditEvents   []domain.AuditEvent
+	outboxEvents  []domain.OutboxRecord
 	nextUserID    int64
 	nextTokenID   int64
 	nextProjectID int64
 	nextTaskID    int64
+	nextAuditID   int64
+	nextOutboxID  int64
 }
 
 func NewMemoryRepository() *MemoryRepository {
@@ -35,10 +41,14 @@ func NewMemoryRepository() *MemoryRepository {
 		tokens:        map[string]domain.RefreshTokenSession{},
 		members:       map[string]map[string]domain.Member{},
 		userQuotas:    map[string]domain.UserQuota{},
+		auditEvents:   []domain.AuditEvent{},
+		outboxEvents:  []domain.OutboxRecord{},
 		nextUserID:    1,
 		nextTokenID:   1,
 		nextProjectID: 1,
 		nextTaskID:    1,
+		nextAuditID:   1,
+		nextOutboxID:  1,
 	}
 }
 
@@ -561,6 +571,26 @@ func (r *MemoryRepository) CreateTaskWithQuota(_ context.Context, t domain.Task,
 		r.nextTaskID++
 	}
 	r.tasks[t.ID] = t
+
+	payload, _ := json.Marshal(map[string]any{
+		"taskId":    t.ID,
+		"projectId": t.ProjectID,
+		"title":     t.Title,
+		"status":    t.Status,
+	})
+	r.outboxEvents = append(r.outboxEvents, domain.OutboxRecord{
+		ID:            r.nextOutboxID,
+		EventID:       fmt.Sprintf("task-created-%s-%d", t.ID, time.Now().UnixNano()),
+		EventType:     "task.created",
+		AggregateType: "task",
+		AggregateID:   t.ID,
+		Payload:       payload,
+		Attempts:      0,
+		AvailableAt:   time.Now().UTC(),
+		CreatedAt:     time.Now().UTC(),
+	})
+	r.nextOutboxID++
+
 	return t, nil
 }
 
@@ -639,6 +669,47 @@ func (r *MemoryRepository) SetUserQuota(_ context.Context, quota domain.UserQuot
 	return nil
 }
 
+func (r *MemoryRepository) ListProjectAuditEvents(_ context.Context, projectID string, limit, offset int) ([]domain.AuditEvent, int, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	var filtered []domain.AuditEvent
+	for _, a := range r.auditEvents {
+		if a.ProjectID == projectID {
+			filtered = append(filtered, a)
+		}
+	}
+	total := len(filtered)
+	if offset < 0 {
+		offset = 0
+	}
+	if offset >= total {
+		return []domain.AuditEvent{}, total, nil
+	}
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	return filtered[offset:end], total, nil
+}
+
+func (r *MemoryRepository) RecordAuditEvent(_ context.Context, event domain.AuditEvent) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if event.ID == "" {
+		event.ID = strconv.FormatInt(r.nextAuditID, 10)
+		r.nextAuditID++
+	}
+	if user, ok := r.users[event.ActorUserID]; ok {
+		event.ActorDisplayName = user.DisplayName
+		event.ActorEmail = user.Email
+	}
+	r.auditEvents = append([]domain.AuditEvent{event}, r.auditEvents...)
+	return nil
+}
+
 func containsFold(value, query string) bool {
 	return len(query) == 0 || len(value) >= len(query) && indexFold(value, query)
 }
@@ -664,4 +735,52 @@ func lower(b byte) byte {
 		return b + ('a' - 'A')
 	}
 	return b
+}
+
+func (r *MemoryRepository) FetchUnpublishedOutboxEvents(_ context.Context, batchSize int) ([]domain.OutboxRecord, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	now := time.Now().UTC()
+	var result []domain.OutboxRecord
+	for _, rec := range r.outboxEvents {
+		if rec.PublishedAt == nil && !rec.AvailableAt.After(now) {
+			result = append(result, rec)
+			if batchSize > 0 && len(result) >= batchSize {
+				break
+			}
+		}
+	}
+	return result, nil
+}
+
+func (r *MemoryRepository) MarkOutboxEventPublished(_ context.Context, id int64) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	now := time.Now().UTC()
+	for i := range r.outboxEvents {
+		if r.outboxEvents[i].ID == id {
+			r.outboxEvents[i].PublishedAt = &now
+			r.outboxEvents[i].LastError = nil
+			return nil
+		}
+	}
+	return domain.ErrNotFound
+}
+
+func (r *MemoryRepository) MarkOutboxEventFailed(_ context.Context, id int64, lastErr string, nextRetry time.Duration) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	next := time.Now().UTC().Add(nextRetry)
+	for i := range r.outboxEvents {
+		if r.outboxEvents[i].ID == id {
+			r.outboxEvents[i].Attempts++
+			r.outboxEvents[i].LastError = &lastErr
+			r.outboxEvents[i].AvailableAt = next
+			return nil
+		}
+	}
+	return domain.ErrNotFound
 }

@@ -18,7 +18,7 @@ echo " Target: ${TARGET_URL}"
 echo " Admin Profiling: ${PPROF_URL}"
 echo "========================================================================"
 
-# التأكد من عمل السيرفر
+# Verify server availability
 if ! curl -s -f "${TARGET_URL}" >/dev/null; then
     echo "ERROR: Target ${TARGET_URL} is unreachable! Ensure containers or server are running."
     exit 1
@@ -30,7 +30,7 @@ echo "--- LOAD TEST RUN [$(date -u +"%Y-%m-%dT%H:%M:%SZ")] MODE: ${MODE} ---" > 
 echo "Launching 2,500 concurrent requests across 50 workers..."
 go run ./scripts/loadrunner "${TARGET_URL}" | tee -a "${OUTPUT_FILE}"
 
-# سحب عينات Profiling حية إن كان منفذ 6060 متاحاً
+# Collect live profiling samples if port 6060 is available
 if curl -s "${PPROF_URL}/" >/dev/null; then
     echo "Capturing active pprof profiles from ${PPROF_URL}..."
     go tool pprof -top "${PPROF_URL}/profile?seconds=2" > "${EVIDENCE_DIR}/profiling/cpu-profile.txt" 2>/dev/null || true

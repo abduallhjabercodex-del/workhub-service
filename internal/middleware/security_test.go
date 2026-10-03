@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-// TestSecurityHeaders يختبر إلحاق ترويسات الأمان القياسية (Security Headers) مثل X-Frame-Options و CSP و nosniff لكل استجابة HTTP.
+// TestSecurityHeaders verifies standard OWASP security response headers are attached.
 func TestSecurityHeaders(t *testing.T) {
 	middleware := SecurityHeaders("default-src 'self'")
 	handler := middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -33,7 +33,7 @@ func TestSecurityHeaders(t *testing.T) {
 	}
 }
 
-// TestRateLimiter يختبر تقييد معدل استخدام واجهة البرمجة (Rate Limiting) للسماح بعدد محدد من الطلبات لكل عنوان IP ورفض الطلبات الزائدة برمز 429 Too Many Requests.
+// TestRateLimiter verifies token bucket limits requests per client key and returns 429 when capacity is exceeded.
 func TestRateLimiter(t *testing.T) {
 	limiter := NewRateLimiter(3, 10*time.Minute)
 	middleware := RateLimit(limiter, nil)

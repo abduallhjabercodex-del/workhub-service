@@ -13,10 +13,10 @@ import (
 	"workhub-service/internal/infrastructure/metrics"
 )
 
-// maxIdempotencyBodySize — الحد الأقصى لحجم الـ body لقراءة الـ fingerprint.
+// maxIdempotencyBodySize is the maximum request body size read for payload fingerprinting.
 const maxIdempotencyBodySize = 1 << 20 // 1 MB
 
-// idempotencyResponseRecorder — يلتقط status + body مع تمرير الكتابة للـ writer الحقيقي.
+// idempotencyResponseRecorder captures status and response body while streaming to downstream writer.
 type idempotencyResponseRecorder struct {
 	http.ResponseWriter
 	statusCode  int
@@ -49,30 +49,30 @@ func (rw *idempotencyResponseRecorder) Write(b []byte) (int, error) {
 	return rw.ResponseWriter.Write(b)
 }
 
-// Flush — يمرّر Flush للـ writer الحقيقي إن دعمه (streaming/SSE).
+// Flush forwards flush signal to underlying ResponseWriter if supported (streaming/SSE).
 func (rw *idempotencyResponseRecorder) Flush() {
 	if f, ok := rw.ResponseWriter.(http.Flusher); ok {
 		f.Flush()
 	}
 }
 
-// Idempotency — يضمن تنفيذ POST/PUT/PATCH مرة واحدة لكل (user, idempotency-key, body).
+// Idempotency ensures POST/PUT/PATCH execution runs exactly once per (user, idempotency-key, body).
 //
-// النمط:
-//  1. Fingerprint body.
-//  2. Get: cached response? → replay.
+// Lifecycle:
+//  1. Fingerprint request body.
+//  2. Get: check for cached response -> replay immediately if found.
 //  3. Begin: SET NX atomic reserve.
-//     - acquired=true  → execute.
-//     - ErrInProgress  → 409 Conflict.
-//     - ErrFingerprintMismatch → 409 Conflict.
-//  4. Execute handler.
-//  5. Save (2xx only) أو Fail (غيره).
+//     - acquired=true  -> proceed with handler execution.
+//     - ErrInProgress  -> 409 Conflict.
+//     - ErrFingerprintMismatch -> 409 Conflict.
+//  4. Execute downstream handler.
+//  5. Save (2xx only) or Fail (non-2xx).
 //
-// Fail-Open: إذا فشل Redis في Get أو Begin، نكمل بدون idempotency مع تحذير.
+// Fail-Open: if Redis errors during Get or Begin, request proceeds without idempotency with warning.
 func Idempotency(store cache.IdempotencyStore, logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// 0) شروط مسبقة.
+			// 0) Preconditions
 			if store == nil {
 				next.ServeHTTP(w, r)
 				return
@@ -97,7 +97,7 @@ func Idempotency(store cache.IdempotencyStore, logger *slog.Logger) func(http.Ha
 				return
 			}
 
-			// 1) اقرأ الـ body لـ fingerprint (مع حد أقصى).
+			// 1) Read request body for fingerprinting (with bounded limit)
 			body, err := io.ReadAll(io.LimitReader(r.Body, maxIdempotencyBodySize+1))
 			if err != nil {
 				logger.WarnContext(r.Context(), "idempotency: read body failed", "error", err)
@@ -114,7 +114,7 @@ func Idempotency(store cache.IdempotencyStore, logger *slog.Logger) func(http.Ha
 
 			ctx := r.Context()
 
-			// 2) اقرأ النتيجة المخزّنة.
+			// 2) Check for cached response
 			cached, err := store.Get(ctx, user.ID, key, fingerprint)
 			if err != nil {
 				if errors.Is(err, cache.ErrFingerprintMismatch) {
@@ -124,7 +124,7 @@ func Idempotency(store cache.IdempotencyStore, logger *slog.Logger) func(http.Ha
 						"idempotency key was reused with a different request body")
 					return
 				}
-				// Redis error → fail-open.
+				// Redis error -> fail-open
 				logger.WarnContext(ctx, "idempotency: get failed (fail-open)", "error", err, "key", key)
 				next.ServeHTTP(w, r)
 				return
@@ -136,7 +136,7 @@ func Idempotency(store cache.IdempotencyStore, logger *slog.Logger) func(http.Ha
 				return
 			}
 
-			// 3) حاول حجز المفتاح ذرّيًا.
+			// 3) Attempt atomic key acquisition
 			acquired, err := store.Begin(ctx, user.ID, key, fingerprint)
 			if err != nil {
 				switch {
@@ -160,7 +160,7 @@ func Idempotency(store cache.IdempotencyStore, logger *slog.Logger) func(http.Ha
 				}
 			}
 			if !acquired {
-				// سباق نادر: ظهرت النتيجة بين Get و Begin. أعد القراءة.
+				// Rare race condition: result completed between Get and Begin; re-read
 				cached, _ := store.Get(ctx, user.ID, key, fingerprint)
 				if cached != nil {
 					metrics.IdempotencyRequestsTotal.WithLabelValues("replayed").Inc()
@@ -171,11 +171,11 @@ func Idempotency(store cache.IdempotencyStore, logger *slog.Logger) func(http.Ha
 				return
 			}
 
-			// 4) حجزنا المفتاح — نضمن تحريره إذا خرجنا بشكل غير طبيعي (panic، إلخ).
+			// 4) Key acquired: ensure cleanup on abnormal exit (panic, timeout)
 			committed := false
 			defer func() {
 				if !committed {
-					// WithoutCancel: احفظ التحرير حتى لو أُلغي ctx.
+					// WithoutCancel: ensure unlock even if request ctx was cancelled
 					_ = store.Fail(context.WithoutCancel(ctx), user.ID, key)
 				}
 			}()
@@ -183,7 +183,7 @@ func Idempotency(store cache.IdempotencyStore, logger *slog.Logger) func(http.Ha
 			rec := newIdempotencyResponseRecorder(w)
 			next.ServeHTTP(rec, r)
 
-			// 5) احفظ 2xx فقط. 4xx/5xx → حرّر الحجز للسماح بإعادة المحاولة.
+			// 5) Cache 2xx only; 4xx/5xx release key to allow retries
 			if rec.statusCode >= 200 && rec.statusCode < 300 {
 				saveErr := store.Save(ctx, user.ID, key, &cache.IdempotencyResponse{
 					StatusCode:  rec.statusCode,
@@ -199,7 +199,7 @@ func Idempotency(store cache.IdempotencyStore, logger *slog.Logger) func(http.Ha
 				return
 			}
 
-			// 4xx/5xx → لا نخزّن (client يجب أن يصحّح ويستخدم مفتاحًا جديدًا).
+			// 4xx/5xx: do not cache (client should correct request and retry with fresh key)
 			metrics.IdempotencyRequestsTotal.WithLabelValues("failed").Inc()
 			_ = store.Fail(ctx, user.ID, key)
 			committed = true
@@ -207,11 +207,11 @@ func Idempotency(store cache.IdempotencyStore, logger *slog.Logger) func(http.Ha
 	}
 }
 
-// replayResponse — يعيد كتابة استجابة مخزّنة.
+// replayResponse writes cached response back to client.
 func replayResponse(w http.ResponseWriter, resp *cache.IdempotencyResponse) {
 	w.Header().Set("Idempotent-Replay", "true")
 	for k, vs := range resp.Headers {
-		// Content-Length سيُضبط تلقائيًا من المُغلّف.
+		// Content-Length is managed automatically by writer
 		if strings.EqualFold(k, "Content-Length") {
 			continue
 		}
@@ -225,7 +225,7 @@ func replayResponse(w http.ResponseWriter, resp *cache.IdempotencyResponse) {
 	}
 }
 
-// cloneHeaders — نسخة مستقلة من الـ headers.
+// cloneHeaders returns an independent copy of headers.
 func cloneHeaders(h http.Header) map[string][]string {
 	out := make(map[string][]string, len(h))
 	for k, vs := range h {
@@ -236,7 +236,7 @@ func cloneHeaders(h http.Header) map[string][]string {
 	return out
 }
 
-// writeIdempotencyError — استجابة JSON متسقة.
+// writeIdempotencyError writes a consistent JSON error response.
 func writeIdempotencyError(w http.ResponseWriter, status int, code, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
@@ -244,153 +244,3 @@ func writeIdempotencyError(w http.ResponseWriter, status int, code, message stri
 	_, _ = w.Write([]byte(`{"error":{"code":"` + code + `","message":"` + message + `"}}`))
 }
 
-/*
-================================================================================
- النسخة المقابلة باستخدام إطار عمل Fiber (للمقارنة فقط - معلّقة ومظللة)
- FIBER EQUIVALENT IMPLEMENTATION (FOR COMPARISON ONLY - COMMENTED OUT)
-================================================================================
-
-import (
-	"context"
-	"errors"
-	"log/slog"
-	"strings"
-	"github.com/gofiber/fiber/v2"
-	"workhub-service/internal/infrastructure/cache"
-	"workhub-service/internal/infrastructure/metrics"
-)
-
-// IdempotencyFiber guarantees idempotent execution of mutating endpoints in Fiber.
-// Note: In Fiber, c.Body() and c.Response().Body() are available directly, eliminating
-// the need for custom response recorders and body wrappers.
-func IdempotencyFiber(store cache.IdempotencyStore, logger *slog.Logger) fiber.Handler {
-	return func(c *fiber.Ctx) error {
-		if store == nil {
-			return c.Next()
-		}
-
-		method := c.Method()
-		if method != fiber.MethodPost && method != fiber.MethodPut && method != fiber.MethodPatch {
-			return c.Next()
-		}
-
-		key := strings.TrimSpace(c.Get("Idempotency-Key"))
-		if key == "" {
-			return c.Next()
-		}
-
-		user, ok := UserFromFiberContext(c)
-		if !ok || user.ID == "" {
-			logger.WarnContext(c.UserContext(), "idempotency key provided without authenticated user")
-			return c.Next()
-		}
-
-		body := c.Body()
-		if len(body) > maxIdempotencyBodySize {
-			logger.WarnContext(c.UserContext(), "idempotency: body too large", "size", len(body))
-			return c.Status(fiber.StatusRequestEntityTooLarge).JSON(fiber.Map{
-				"error": fiber.Map{
-					"code":    "payload_too_large",
-					"message": "request body too large for idempotency",
-				},
-			})
-		}
-		fingerprint := cache.Fingerprint(body)
-		ctx := c.UserContext()
-
-		// Check cached response
-		cached, err := store.Get(ctx, user.ID, key, fingerprint)
-		if err != nil {
-			if errors.Is(err, cache.ErrFingerprintMismatch) {
-				metrics.IdempotencyRequestsTotal.WithLabelValues("mismatch").Inc()
-				return c.Status(fiber.StatusConflict).JSON(fiber.Map{
-					"error": fiber.Map{
-						"code":    "idempotency_key_mismatch",
-						"message": "idempotency key was reused with a different request body",
-					},
-				})
-			}
-			logger.WarnContext(ctx, "idempotency: get failed (fail-open)", "error", err, "key", key)
-			return c.Next()
-		}
-		if cached != nil {
-			metrics.IdempotencyRequestsTotal.WithLabelValues("replayed").Inc()
-			c.Set("Idempotent-Replay", "true")
-			for k, vs := range cached.Headers {
-				if !strings.EqualFold(k, "Content-Length") && len(vs) > 0 {
-					c.Set(k, vs[0])
-				}
-			}
-			return c.Status(cached.StatusCode).Send(cached.Body)
-		}
-
-		// Reserve atomic key
-		acquired, err := store.Begin(ctx, user.ID, key, fingerprint)
-		if err != nil {
-			switch {
-			case errors.Is(err, cache.ErrInProgress):
-				metrics.IdempotencyRequestsTotal.WithLabelValues("in_progress").Inc()
-				c.Set("Retry-After", "1")
-				return c.Status(fiber.StatusConflict).JSON(fiber.Map{
-					"error": fiber.Map{
-						"code":    "idempotency_in_progress",
-						"message": "request with this idempotency key is already in progress",
-					},
-				})
-			case errors.Is(err, cache.ErrFingerprintMismatch):
-				metrics.IdempotencyRequestsTotal.WithLabelValues("mismatch").Inc()
-				return c.Status(fiber.StatusConflict).JSON(fiber.Map{
-					"error": fiber.Map{
-						"code":    "idempotency_key_mismatch",
-						"message": "idempotency key was reused with a different request body",
-					},
-				})
-			default:
-				logger.WarnContext(ctx, "idempotency: begin failed (fail-open)", "error", err, "key", key)
-				return c.Next()
-			}
-		}
-		if !acquired {
-			cached, _ := store.Get(ctx, user.ID, key, fingerprint)
-			if cached != nil {
-				metrics.IdempotencyRequestsTotal.WithLabelValues("replayed").Inc()
-				c.Set("Idempotent-Replay", "true")
-				return c.Status(cached.StatusCode).Send(cached.Body)
-			}
-			return c.Next()
-		}
-
-		committed := false
-		defer func() {
-			if !committed {
-				_ = store.Fail(context.WithoutCancel(ctx), user.ID, key)
-			}
-		}()
-
-		// Execute downstream handlers
-		execErr := c.Next()
-		statusCode := c.Response().StatusCode()
-
-		if statusCode >= 200 && statusCode < 300 {
-			headers := make(map[string][]string)
-			c.Response().Header.VisitAll(func(k, v []byte) {
-				headers[string(k)] = []string{string(v)}
-			})
-
-			_ = store.Save(ctx, user.ID, key, &cache.IdempotencyResponse{
-				StatusCode:  statusCode,
-				Headers:     headers,
-				Body:        c.Response().Body(),
-				Fingerprint: fingerprint,
-			})
-			committed = true
-			return execErr
-		}
-
-		metrics.IdempotencyRequestsTotal.WithLabelValues("failed").Inc()
-		_ = store.Fail(ctx, user.ID, key)
-		committed = true
-		return execErr
-	}
-}
-*/

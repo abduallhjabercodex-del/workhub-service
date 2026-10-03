@@ -20,9 +20,12 @@ func newTestAuthAPI() (*API, *service.WorkHub) {
 	deps := service.Deps{
 		Projects:    repo,
 		Tasks:       repo,
+		Summaries:   repo,
 		Users:       repo,
 		Auth:        repo,
 		Memberships: repo,
+		Quotas:      repo,
+		Pinger:      repo,
 		Config: service.AuthConfig{
 			JWTSecret:       "test-jwt-secret-key-at-least-32-chars-long!",
 			AccessTokenTTL:  15 * time.Minute,
@@ -37,7 +40,7 @@ func newTestAuthAPI() (*API, *service.WorkHub) {
 	return NewAPI(s, nil, nil, slog.Default()), s
 }
 
-// TestAuthRegistrationLoginRefreshLogoutFlow يختبر التدفق الكامل لعمليات التوثيق عبر نقاط النهاية HTTP: التسجيل، منع الحسابات المكررة، تسجيل الدخول، استعلام البيانات الشخصية (/me)، تجديد הـ Tokens، حظر الرموز المستخدمة سابقاً، وتسجيل الخروج.
+// TestAuthRegistrationLoginRefreshLogoutFlow tests the complete authentication lifecycle across HTTP endpoints: registration, duplicate email prevention, login, user profile query (/me), token rotation, replay prevention of consumed tokens, and logout.
 func TestAuthRegistrationLoginRefreshLogoutFlow(t *testing.T) {
 	api, _ := newTestAuthAPI()
 	handlerStack := middleware.Authenticate("test-jwt-secret-key-at-least-32-chars-long!")(api.Routes())

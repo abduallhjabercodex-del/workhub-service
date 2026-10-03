@@ -49,6 +49,10 @@ func (f *failingRepository) DeleteProject(_ context.Context, _ string) error {
 	return errors.New("connection refused")
 }
 
+func (f *failingRepository) GetProjectSummary(_ context.Context, _ string) (domain.ProjectSummary, error) {
+	return domain.ProjectSummary{}, errors.New("connection refused")
+}
+
 func (f *failingRepository) CreateTask(_ context.Context, _ domain.Task) (domain.Task, error) {
 	return domain.Task{}, errors.New("connection refused")
 }
@@ -153,10 +157,12 @@ func TestDBFailureScenarios(t *testing.T) {
 	deps := service.Deps{
 		Projects:             failingRepo,
 		Tasks:                failingRepo,
+		Summaries:            failingRepo,
 		Users:                failingRepo,
 		Auth:                 failingRepo,
 		Memberships:          failingRepo,
 		Quotas:               failingRepo,
+		Pinger:               failingRepo,
 		MaxProjectsPerUser:   10,
 		MaxMembersPerProject: 10,
 		MaxTasksPerProject:   10,

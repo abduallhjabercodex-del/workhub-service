@@ -15,9 +15,12 @@ func newTestService() *WorkHub {
 	deps := Deps{
 		Projects:    repo,
 		Tasks:       repo,
+		Summaries:   repo,
 		Users:       repo,
 		Auth:        repo,
 		Memberships: repo,
+		Quotas:      repo,
+		Pinger:      repo,
 		Config: AuthConfig{
 			JWTSecret:       "test-jwt-secret-key-at-least-32-chars-long!",
 			AccessTokenTTL:  15 * time.Minute,
@@ -32,7 +35,7 @@ func newTestService() *WorkHub {
 	return s
 }
 
-// TestCreateProjectValidation يختبر قيود ومدخلات إنشاء مشروع جديد (أسماء صالحة، أسماء فارغة، والطلبات غير الموثوقة).
+// TestCreateProjectValidation tests input validation and constraints for project creation (valid names, empty names, and unauthenticated requests).
 func TestCreateProjectValidation(t *testing.T) {
 	s := newTestService()
 	ctx := context.Background()
@@ -61,7 +64,7 @@ func TestCreateProjectValidation(t *testing.T) {
 	}
 }
 
-// TestTaskStatusAndRBACValidation يختبر التحقق من الصلاحيات المستندة إلى الأدوار (RBAC) بين المالك والمشاهد وتحديث حالات المهام المدعومة وغير المدعومة.
+// TestTaskStatusAndRBACValidation tests role-based access control (RBAC) between owners and viewers, as well as updating supported and unsupported task statuses.
 func TestTaskStatusAndRBACValidation(t *testing.T) {
 	s := newTestService()
 	ctx := context.Background()
@@ -104,7 +107,7 @@ func TestTaskStatusAndRBACValidation(t *testing.T) {
 	}
 }
 
-// TestMissingProjectAndTask يختبر التعامل السليم مع محاولات الوصول لمشاريع أو مهام غير موجودة بالأساس أو غير مصرح للمستخدم بزيارتها.
+// TestMissingProjectAndTask tests graceful handling of access attempts to nonexistent or inaccessible projects or tasks.
 func TestMissingProjectAndTask(t *testing.T) {
 	s := newTestService()
 	ctx := context.Background()
@@ -119,7 +122,7 @@ func TestMissingProjectAndTask(t *testing.T) {
 	}
 }
 
-// TestDeleteTaskAndLastOwnerGuard يختبر إمكانية حذف المهام ومنع حذف المالك الأخير للمشروع (Last Owner Protection Guard).
+// TestDeleteTaskAndLastOwnerGuard tests task deletion and verifies that removing the last owner is forbidden (Last Owner Protection Guard).
 func TestDeleteTaskAndLastOwnerGuard(t *testing.T) {
 	s := newTestService()
 	ctx := context.Background()
@@ -149,7 +152,7 @@ func TestDeleteTaskAndLastOwnerGuard(t *testing.T) {
 	}
 }
 
-// TestAtomicRefreshTokenAndReplayDetection يختبر التدوير الذري لرمز التحديث (Refresh Token Rotation) وكشف إعادة استخدام الرموز القديمة (Replay Detection) وإلغاء صلاحية الجلسات فوراً للأمان.
+// TestAtomicRefreshTokenAndReplayDetection tests atomic refresh token rotation, replay attack detection, and immediate session revocation for security.
 func TestAtomicRefreshTokenAndReplayDetection(t *testing.T) {
 	s := newTestService()
 	ctx := context.Background()
@@ -181,7 +184,7 @@ func TestAtomicRefreshTokenAndReplayDetection(t *testing.T) {
 	}
 }
 
-// TestConcurrentRefreshTokenRace يختبر السباق المتزامن عند تجديد الرمز (Race Condition) والتأكد من نجاح عملية التحديث لمرة واحدة فقط وإفشال المحاولات المتزامنة الأخرى.
+// TestConcurrentRefreshTokenRace tests concurrent race conditions during token refresh, ensuring exactly one attempt succeeds while concurrent attempts fail.
 func TestConcurrentRefreshTokenRace(t *testing.T) {
 	s := newTestService()
 	ctx := context.Background()
@@ -210,3 +213,111 @@ func TestConcurrentRefreshTokenRace(t *testing.T) {
 		t.Fatalf("concurrent refresh success count = %d, expected at most 1 due to atomic rotation", successCount)
 	}
 }
+
+type testEventCapture struct {
+	mu     sync.Mutex
+	events []domain.Event
+}
+
+func (c *testEventCapture) Publish(_ context.Context, e domain.Event) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.events = append(c.events, e)
+	return nil
+}
+
+func (c *testEventCapture) HasType(eventType string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	for _, e := range c.events {
+		if e.Type == eventType {
+			return true
+		}
+	}
+	return false
+}
+
+func TestPasswordBoundsAndValidation(t *testing.T) {
+	s := newTestService()
+	ctx := context.Background()
+
+	// Password longer than 72 bytes must be rejected
+	longPassword := "A1!aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+	if len(longPassword) <= 72 {
+		t.Fatalf("password should be > 72 bytes")
+	}
+	_, err := s.Register(ctx, domain.RegisterInput{
+		Email:       "longpwd@example.com",
+		DisplayName: "LongPwd User",
+		Password:    longPassword,
+	})
+	if err != ErrInvalidInput {
+		t.Fatalf("register with password > 72 bytes error = %v, want ErrInvalidInput", err)
+	}
+}
+
+func TestProjectMemberValidation(t *testing.T) {
+	s := newTestService()
+	ctx := context.Background()
+
+	u, _ := s.Register(ctx, domain.RegisterInput{Email: "memval@example.com", DisplayName: "MemVal", Password: "SecurePassword123"})
+	proj, _ := s.CreateProject(ctx, u.User.ID, domain.CreateProjectInput{Name: "MemValProj"})
+
+	// Empty target user ID -> ErrInvalidInput
+	if err := s.AddProjectMember(ctx, u.User.ID, proj.ID, "", domain.RoleMember); err != ErrInvalidInput {
+		t.Fatalf("add member with empty targetUserID err = %v, want ErrInvalidInput", err)
+	}
+
+	// Empty project ID -> ErrInvalidInput
+	if err := s.AddProjectMember(ctx, u.User.ID, "", u.User.ID, domain.RoleMember); err != ErrInvalidInput {
+		t.Fatalf("add member with empty projectID err = %v, want ErrInvalidInput", err)
+	}
+
+	// Remove member with empty target user ID -> ErrInvalidInput
+	if err := s.RemoveProjectMember(ctx, u.User.ID, proj.ID, ""); err != ErrInvalidInput {
+		t.Fatalf("remove member with empty targetUserID err = %v, want ErrInvalidInput", err)
+	}
+}
+
+func TestLifecycleEvents(t *testing.T) {
+	repo := repository.NewMemoryRepository()
+	capture := &testEventCapture{}
+	deps := Deps{
+		Projects:    repo,
+		Tasks:       repo,
+		Summaries:   repo,
+		Users:       repo,
+		Auth:        repo,
+		Memberships: repo,
+		Quotas:      repo,
+		Pinger:      repo,
+		Publisher:   capture,
+		Config: AuthConfig{
+			JWTSecret:       "test-jwt-secret-key-at-least-32-chars-long!",
+			AccessTokenTTL:  15 * time.Minute,
+			RefreshTokenTTL: 168 * time.Hour,
+			BCryptCost:      10,
+		},
+	}
+	s, err := NewWorkHub(deps)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+
+	u, _ := s.Register(ctx, domain.RegisterInput{Email: "events@example.com", DisplayName: "Events", Password: "SecurePassword123"})
+	proj, _ := s.CreateProject(ctx, u.User.ID, domain.CreateProjectInput{Name: "EventProj"})
+	task, _ := s.CreateTask(ctx, u.User.ID, proj.ID, domain.CreateTaskInput{Title: "EventTask"})
+
+	doneStatus := "done"
+	_, _ = s.UpdateTask(ctx, u.User.ID, task.ID, domain.UpdateTaskInput{Status: &doneStatus})
+	_ = s.DeleteTask(ctx, u.User.ID, task.ID)
+	_ = s.DeleteProject(ctx, u.User.ID, proj.ID)
+
+	for _, expectedType := range []string{"project.created", "task.created", "task.updated", "task.deleted", "project.deleted"} {
+		if !capture.HasType(expectedType) {
+			t.Errorf("expected event %q was not published", expectedType)
+		}
+	}
+}
+

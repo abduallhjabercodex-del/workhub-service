@@ -26,10 +26,12 @@ func setupAbuseApp(t *testing.T) (http.Handler, *service.WorkHub, string) {
 	deps := service.Deps{
 		Projects:             repo,
 		Tasks:                repo,
+		Summaries:            repo,
 		Users:                repo,
 		Auth:                 repo,
 		Memberships:          repo,
 		Quotas:               repo,
+		Pinger:               repo,
 		MaxProjectsPerUser:   10,
 		MaxMembersPerProject: 10,
 		MaxTasksPerProject:   10,

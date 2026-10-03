@@ -13,7 +13,8 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// TestProjectSummaryCacheHitMissTTLAndInvalidation يختبر دورة حياة الذاكرة المؤقتة (الكاش) لملخص المشروع: حالات الإصابة (Hit)، الفقدان (Miss)، انقضاء الصلاحية (TTL)، الإبطال (Invalidation)، وسلوك الكاش عند انقطاع خادم Redis.
+// TestProjectSummaryCacheHitMissTTLAndInvalidation tests project summary cache lifecycle:
+// hits, misses, TTL expiry, cache invalidation, and fail-open behavior during Redis outage.
 func TestProjectSummaryCacheHitMissTTLAndInvalidation(t *testing.T) {
 	mini := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: mini.Addr()})
@@ -39,7 +40,7 @@ func TestProjectSummaryCacheHitMissTTLAndInvalidation(t *testing.T) {
 		t.Fatal("expired key returned a hit")
 	}
 
-	mini.Close() // mini.Close(): نقوم بسحق وإغلاق خادم Redis تماماً لمحاكاة عطل كوارثي بانهيار Redis في الإنتاج!
+	mini.Close() // Shut down Redis to simulate backend outage
 
 	if _, ok := cache.Get(ctx, "42"); ok {
 		t.Fatal("offline Redis returned a hit")
@@ -49,7 +50,7 @@ func TestProjectSummaryCacheHitMissTTLAndInvalidation(t *testing.T) {
 	cache.Invalidate(ctx, "42")
 }
 
-// TestCacheStampedeProtection يختبر حماية الكاش من ظاهرة تزاحم الطلبات المتزامنة (Cache Stampede / Thundering Herd) والتأكد من إنجاز الاستعلام مرة واحدة فقط في دالة التجميد عبر قفل المزاحمة.
+// TestCacheStampedeProtection tests thundering herd prevention, ensuring compute runs once across concurrent callers.
 func TestCacheStampedeProtection(t *testing.T) {
 	mini := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: mini.Addr()})
@@ -59,7 +60,7 @@ func TestCacheStampedeProtection(t *testing.T) {
 	var computeCalls int32
 	projectID := "proj-stampede-1"
 
-	// محاكاة 50 goroutine تطلب ملخص نفس المشروع متزامنة عند حدث Cache Miss
+	// Simulate 50 concurrent goroutines requesting the same project summary upon cache miss
 	const concurrentRequests = 50
 	errCh := make(chan error, concurrentRequests)
 	doneCh := make(chan domain.ProjectSummary, concurrentRequests)
@@ -67,9 +68,9 @@ func TestCacheStampedeProtection(t *testing.T) {
 	for i := 0; i < concurrentRequests; i++ {
 		go func() {
 			summary, err := cache.GetOrCompute(ctx, projectID, func(ctx context.Context) (domain.ProjectSummary, error) {
-				// زيادة العداد لتتبع عدد المرات التي تم تنفيذ الاستعلام فيها فعلياً
+				// Increment counter to verify actual execution count
 				atomic.AddInt32(&computeCalls, 1)
-				time.Sleep(20 * time.Millisecond) // محاكاة زمن استعلام قاعدة البيانات
+				time.Sleep(20 * time.Millisecond) // Simulate DB latency
 				return domain.ProjectSummary{ProjectID: projectID, TaskCount: 100}, nil
 			})
 			if err != nil {
@@ -91,7 +92,7 @@ func TestCacheStampedeProtection(t *testing.T) {
 		}
 	}
 
-	// الإثبات العملي: بالرغم من وجود 50 طلب متزامن، دالة computeFn يجب أن تُستدعى مَرّة واحِدَة فَقَط!
+	// Verification: across 50 concurrent requests, computeFn must execute exactly once
 	if calls := atomic.LoadInt32(&computeCalls); calls != 1 {
 		t.Fatalf("Cache Stampede protection failed! Expected 1 compute call, got %d", calls)
 	}

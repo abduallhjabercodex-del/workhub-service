@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -13,9 +14,15 @@ import (
 )
 
 func (s *WorkHub) CreateTask(ctx context.Context, actorUserID, projectID string, in domain.CreateTaskInput) (domain.Task, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	ctx, span := telemetry.Tracer().Start(ctx, "WorkHub.CreateTask")
 	defer span.End()
 
+	if strings.TrimSpace(projectID) == "" {
+		return domain.Task{}, ErrProjectNotFound
+	}
 	if _, err := s.CheckAccess(ctx, actorUserID, projectID, domain.RoleMember); err != nil {
 		return domain.Task{}, err
 	}
@@ -32,17 +39,27 @@ func (s *WorkHub) CreateTask(ctx context.Context, actorUserID, projectID string,
 	}
 
 	task := domain.Task{
-		ProjectID: projectID,
-		CreatedBy: actorUserID, // ← يستخدم الفاعل الفعلي
-		Title:     title,
-		Status:    "todo",
-		CreatedAt: s.now().UTC(),
+		ProjectID:  projectID,
+		CreatedBy:  actorUserID,
+		AssigneeID: in.AssigneeID,
+		Title:      title,
+		Status:     "todo",
+		CreatedAt:  s.now().UTC(),
 	}
+
+	payloadMap := map[string]interface{}{
+		"title": title,
+	}
+	if in.AssigneeID != nil {
+		payloadMap["assignee_id"] = *in.AssigneeID
+	}
+	rawPayload, _ := json.Marshal(payloadMap)
+
 	audit := domain.AuditEvent{
-		ActorUserID: actorUserID, // ← إضافة الفاعل للـ Audit
+		ActorUserID: actorUserID,
 		ProjectID:   projectID,
 		EventType:   "task.created",
-		Payload:     []byte(`{"source":"workhub"}`),
+		Payload:     rawPayload,
 		CreatedAt:   task.CreatedAt,
 	}
 
@@ -80,6 +97,15 @@ func (s *WorkHub) CreateTask(ctx context.Context, actorUserID, projectID string,
 }
 
 func (s *WorkHub) GetTask(ctx context.Context, actorUserID, id string) (domain.Task, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, span := telemetry.Tracer().Start(ctx, "WorkHub.GetTask")
+	defer span.End()
+
+	if strings.TrimSpace(id) == "" {
+		return domain.Task{}, ErrTaskNotFound
+	}
 	t, err := s.tasks.GetTask(ctx, id)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
@@ -93,14 +119,23 @@ func (s *WorkHub) GetTask(ctx context.Context, actorUserID, id string) (domain.T
 	return t, nil
 }
 
-// ListTasks — إصلاح IDOR: projectID إلزامي
+// ListTasks — IDOR fix: projectID is required
 func (s *WorkHub) ListTasks(
 	ctx context.Context,
 	actorUserID, projectID, status, q, sortBy string,
 	page, limit int,
 ) ([]domain.Task, int, error) {
-	if projectID == "" {
-		return nil, 0, ErrInvalidInput // ← رفض الفراغ
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, span := telemetry.Tracer().Start(ctx, "WorkHub.ListTasks")
+	defer span.End()
+
+	if strings.TrimSpace(projectID) == "" {
+		return nil, 0, ErrInvalidInput
+	}
+	if page < 0 || limit < 0 {
+		return nil, 0, ErrInvalidInput
 	}
 	if _, err := s.CheckAccess(ctx, actorUserID, projectID); err != nil {
 		return nil, 0, err
@@ -113,6 +148,15 @@ func (s *WorkHub) ListTasks(
 }
 
 func (s *WorkHub) UpdateTask(ctx context.Context, actorUserID, id string, in domain.UpdateTaskInput) (domain.Task, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, span := telemetry.Tracer().Start(ctx, "WorkHub.UpdateTask")
+	defer span.End()
+
+	if strings.TrimSpace(id) == "" {
+		return domain.Task{}, ErrTaskNotFound
+	}
 	t, err := s.tasks.GetTask(ctx, id)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
@@ -139,14 +183,61 @@ func (s *WorkHub) UpdateTask(ctx context.Context, actorUserID, id string, in dom
 			return domain.Task{}, ErrInvalidInput
 		}
 	}
-	result, err := s.tasks.UpdateTask(ctx, t)
-	if err == nil {
-		s.invalidateSummary(ctx, t.ProjectID)
+	if in.AssigneeID != nil {
+		t.AssigneeID = in.AssigneeID
 	}
-	return result, err
+	result, err := s.tasks.UpdateTask(ctx, t)
+	if err != nil {
+		return domain.Task{}, err
+	}
+	s.invalidateSummary(ctx, t.ProjectID)
+
+	updatePayloadMap := map[string]interface{}{
+		"title":  result.Title,
+		"status": result.Status,
+	}
+	if result.AssigneeID != nil {
+		updatePayloadMap["assignee_id"] = *result.AssigneeID
+	}
+	rawUpdatePayload, _ := json.Marshal(updatePayloadMap)
+	s.recordAudit(ctx, domain.AuditEvent{
+		ActorUserID: actorUserID,
+		ProjectID:   result.ProjectID,
+		TaskID:      result.ID,
+		EventType:   "task.updated",
+		Payload:     rawUpdatePayload,
+		CreatedAt:   s.now().UTC(),
+	})
+
+	if s.publisher != nil {
+		event := domain.Event{
+			ID:            fmt.Sprintf("task-updated-%s-%d", result.ID, s.now().UnixNano()),
+			Type:          "task.updated",
+			AggregateType: "task",
+			AggregateID:   result.ID,
+			ProjectID:     result.ProjectID,
+			TaskID:        result.ID,
+			OccurredAt:    s.now().UTC(),
+			CorrelationID: middleware.RequestIDFromContext(ctx),
+		}
+		if pubErr := s.publisher.Publish(ctx, event); pubErr != nil {
+			slog.ErrorContext(ctx, "publish task.updated failed",
+				"error", pubErr, "task_id", result.ID)
+		}
+	}
+	return result, nil
 }
 
 func (s *WorkHub) DeleteTask(ctx context.Context, actorUserID, id string) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	ctx, span := telemetry.Tracer().Start(ctx, "WorkHub.DeleteTask")
+	defer span.End()
+
+	if strings.TrimSpace(id) == "" {
+		return ErrTaskNotFound
+	}
 	t, err := s.tasks.GetTask(ctx, id)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
@@ -154,7 +245,13 @@ func (s *WorkHub) DeleteTask(ctx context.Context, actorUserID, id string) error 
 		}
 		return fmt.Errorf("get task: %w", err)
 	}
-	if _, err := s.CheckAccess(ctx, actorUserID, t.ProjectID, domain.RoleAdmin); err != nil {
+	// Creator can delete their own task with RoleMember access.
+	// Deleting other members' tasks requires RoleAdmin.
+	requiredRole := domain.RoleAdmin
+	if t.CreatedBy == actorUserID {
+		requiredRole = domain.RoleMember
+	}
+	if _, err := s.CheckAccess(ctx, actorUserID, t.ProjectID, requiredRole); err != nil {
 		return err
 	}
 	if err := s.tasks.DeleteTask(ctx, id); err != nil {
@@ -164,5 +261,34 @@ func (s *WorkHub) DeleteTask(ctx context.Context, actorUserID, id string) error 
 		return fmt.Errorf("delete task: %w", err)
 	}
 	s.invalidateSummary(ctx, t.ProjectID)
+
+	delPayload, _ := json.Marshal(map[string]interface{}{
+		"title": t.Title,
+	})
+	s.recordAudit(ctx, domain.AuditEvent{
+		ActorUserID: actorUserID,
+		ProjectID:   t.ProjectID,
+		TaskID:      t.ID,
+		EventType:   "task.deleted",
+		Payload:     delPayload,
+		CreatedAt:   s.now().UTC(),
+	})
+
+	if s.publisher != nil {
+		event := domain.Event{
+			ID:            fmt.Sprintf("task-deleted-%s-%d", t.ID, s.now().UnixNano()),
+			Type:          "task.deleted",
+			AggregateType: "task",
+			AggregateID:   t.ID,
+			ProjectID:     t.ProjectID,
+			TaskID:        t.ID,
+			OccurredAt:    s.now().UTC(),
+			CorrelationID: middleware.RequestIDFromContext(ctx),
+		}
+		if pubErr := s.publisher.Publish(ctx, event); pubErr != nil {
+			slog.ErrorContext(ctx, "publish task.deleted failed",
+				"error", pubErr, "task_id", t.ID)
+		}
+	}
 	return nil
 }

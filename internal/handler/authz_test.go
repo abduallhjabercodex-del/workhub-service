@@ -21,9 +21,12 @@ func newTestSecurityAPI() (*API, *service.WorkHub, domain.AuthResponse, domain.A
 	deps := service.Deps{
 		Projects:    repo,
 		Tasks:       repo,
+		Summaries:   repo,
 		Users:       repo,
 		Auth:        repo,
 		Memberships: repo,
+		Quotas:      repo,
+		Pinger:      repo,
 		Config: service.AuthConfig{
 			JWTSecret:       "test-jwt-secret-key-at-least-32-chars-long!",
 			AccessTokenTTL:  15 * time.Minute,
@@ -44,7 +47,7 @@ func newTestSecurityAPI() (*API, *service.WorkHub, domain.AuthResponse, domain.A
 	return NewAPI(s, nil, nil, slog.Default()), s, u1, u2
 }
 
-// TestSecurityHeadersOnAPIRoutes يختبر إلحاق ترويسات الحماية من الهجمات لتأمين كافة مسارات الواجهة البرمجية (API Routes).
+// TestSecurityHeadersOnAPIRoutes tests that defense-in-depth security headers are applied to secure all API routes.
 func TestSecurityHeadersOnAPIRoutes(t *testing.T) {
 	api, _, _, _ := newTestSecurityAPI()
 	handlerStack := middleware.SecurityHeaders("")(api.Routes())
@@ -61,7 +64,7 @@ func TestSecurityHeadersOnAPIRoutes(t *testing.T) {
 	}
 }
 
-// TestHorizontalAndVerticalPrivilegeEscalation يختبر الحماية من هجمات تصعيد الصلاحيات الأفقية (وصول غير الأعضاء للمشاريع) والرأسية (ترقية الأعضاء العاديين لأنفسهم أو لغيرهم دون صلاحيات مالك).
+// TestHorizontalAndVerticalPrivilegeEscalation tests prevention of horizontal privilege escalation (non-members accessing projects) and vertical privilege escalation (regular members promoting themselves or others without owner privileges).
 func TestHorizontalAndVerticalPrivilegeEscalation(t *testing.T) {
 	api, s, u1, u2 := newTestSecurityAPI()
 	tokenA := u1.AccessToken
@@ -124,7 +127,7 @@ func TestHorizontalAndVerticalPrivilegeEscalation(t *testing.T) {
 	}
 }
 
-// TestPayloadSizeLimiter يختبر حظر الأجسام المفرطة في الضخامة (Oversized Payloads) لحماية الخادم من إنهاك الذاكرة ومحاولات Denial of Service.
+// TestPayloadSizeLimiter tests blocking oversized payloads to protect the server against memory exhaustion and Denial of Service attempts.
 func TestPayloadSizeLimiter(t *testing.T) {
 	api, _, u1, _ := newTestSecurityAPI()
 	tokenA := u1.AccessToken

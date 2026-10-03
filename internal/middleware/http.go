@@ -27,8 +27,8 @@ func init() {
 	}
 }
 
-// Chain — الترتيب من الخارج إلى الداخل:
-// Recovery → RequestID → RequestLog → Metrics → RequestTimeout → next
+// Chain middleware ordering from outer to inner:
+// Recovery -> RequestID -> RequestLog -> Metrics -> RequestTimeout -> next
 func Chain(next http.Handler, logger *slog.Logger, timeout time.Duration) http.Handler {
 	h := next
 	h = RequestTimeout(timeout)(h)
@@ -45,7 +45,7 @@ func RequestID(next http.Handler) http.Handler {
 		if id == "" {
 			id = newRequestID()
 		}
-		// نضع الـ ID في context فقط — `requestID(r)` يجب أن يقرأ من context.
+		// Store ID in request context for downstream handlers
 		ctx := context.WithValue(r.Context(), requestIDKey{}, id)
 		w.Header().Set("X-Request-ID", id)
 		next.ServeHTTP(w, r.WithContext(ctx))
@@ -59,7 +59,7 @@ func RequestIDFromContext(ctx context.Context) string {
 	return ""
 }
 
-// ID — للتوافق مع الكود القديم.
+// ID provides backward compatibility for legacy callers.
 func ID(ctx context.Context) string { return RequestIDFromContext(ctx) }
 
 func RequestTimeout(timeout time.Duration) func(http.Handler) http.Handler {
@@ -86,7 +86,7 @@ func Recovery(logger *slog.Logger) func(http.Handler) http.Handler {
 	}
 }
 
-// responseRecorder — يلتقط status code لـ RequestLog.
+// responseRecorder captures HTTP status code for RequestLog.
 type responseRecorder struct {
 	http.ResponseWriter
 	status int
@@ -134,7 +134,7 @@ func RequestLog(logger *slog.Logger) func(http.Handler) http.Handler {
 	}
 }
 
-// newRequestID — مولد عالي الأداء منخفض التخصيص خالٍ من أقفال النواة (Zero-Lock Atomic Generator)
+// newRequestID generates high-throughput, low-allocation request IDs via atomic counters.
 func newRequestID() string {
 	seq := reqIDCounter.Add(1)
 	var buf [32]byte
@@ -147,86 +147,8 @@ func newRequestID() string {
 	return string(buf[:])
 }
 
-// NewRequestID — دالة عامة تتيح اختبار واستخدام المولد المحسن
+// NewRequestID exports request ID generation for benchmarks and testing.
 func NewRequestID() string {
 	return newRequestID()
 }
 
-/*
-================================================================================
- النسخة المقابلة باستخدام إطار عمل Fiber (للمقارنة فقط - معلّقة ومظللة)
- FIBER EQUIVALENT IMPLEMENTATION (FOR COMPARISON ONLY - COMMENTED OUT)
-================================================================================
-
-import (
-	"log/slog"
-	"runtime/debug"
-	"time"
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/requestid"
-)
-
-// RequestIDFiber handles request ID generation and header injection in Fiber
-func RequestIDFiber() fiber.Handler {
-	return requestid.New(requestid.Config{
-		Header:     "X-Request-ID",
-		Generator:  newRequestID,
-		ContextKey: "requestid",
-	})
-}
-
-func RequestIDFromFiber(c *fiber.Ctx) string {
-	if id, ok := c.Locals("requestid").(string); ok && id != "" {
-		return id
-	}
-	return c.Get("X-Request-ID")
-}
-
-// RecoveryFiber handles panic recovery in Fiber
-func RecoveryFiber(logger *slog.Logger) fiber.Handler {
-	return func(c *fiber.Ctx) (err error) {
-		defer func() {
-			if rec := recover(); rec != nil {
-				logger.ErrorContext(c.UserContext(), "panic recovered",
-					"panic", rec,
-					"stack", string(debug.Stack()))
-
-				err = c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-					"error": fiber.Map{
-						"code":    "internal_error",
-						"message": "internal server error",
-					},
-				})
-			}
-		}()
-		return c.Next()
-	}
-}
-
-// RequestLogFiber logs incoming HTTP requests with latency and status code
-func RequestLogFiber(logger *slog.Logger) fiber.Handler {
-	return func(c *fiber.Ctx) error {
-		start := time.Now()
-		err := c.Next()
-
-		status := c.Response().StatusCode()
-		attrs := []any{
-			"method", c.Method(),
-			"path", c.Path(),
-			"status", status,
-			"duration_ms", time.Since(start).Milliseconds(),
-			"remote_addr", c.IP(),
-		}
-
-		if status >= 500 {
-			logger.ErrorContext(c.UserContext(), "http request", attrs...)
-		} else if status >= 400 {
-			logger.WarnContext(c.UserContext(), "http request", attrs...)
-		} else {
-			logger.InfoContext(c.UserContext(), "http request", attrs...)
-		}
-
-		return err
-	}
-}
-*/

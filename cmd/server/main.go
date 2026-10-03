@@ -61,25 +61,53 @@ func run() error {
 		}()
 	}
 
-	// --- Database ---
-	var projects domain.ProjectRepository
-	var tasks domain.TaskRepository
-	var closeStore func() = func() {}
+	// --- Database & Repositories ---
+	var (
+		projects    domain.ProjectRepository
+		tasks       domain.TaskRepository
+		summaries   domain.SummaryRepository
+		users       domain.UserRepository
+		authRepo    domain.AuthRepository
+		memberships domain.MembershipRepository
+		quotas      domain.QuotaRepository
+		audits      domain.AuditRepository
+		outbox      domain.OutboxRepository
+		pinger      domain.Pinger
+		closeStore  = func() {}
+	)
 
 	if cfg.DatabaseURL == "" {
 		if cfg.AppEnv == "production" {
 			return errors.New("DATABASE_URL required in production")
 		}
 		logger.Warn("using in-memory repository (development only)")
-		memory := repository.NewMemoryRepository()
-		projects, tasks = memory, memory
+		mem := repository.NewMemoryRepository()
+		projects = mem
+		tasks = mem
+		summaries = mem
+		users = mem
+		authRepo = mem
+		memberships = mem
+		quotas = mem
+		audits = mem
+		outbox = mem
+		pinger = mem
 	} else {
 		pool, err := setupPool(cfg)
 		if err != nil {
 			return err
 		}
 		store := repository.NewPostgresRepository(pool)
-		projects, tasks = store, store
+		projects = store
+		tasks = store
+		summaries = store
+		users = store
+		authRepo = store
+		memberships = store
+		quotas = store
+		audits = store
+		outbox = store
+		pinger = store
 		closeStore = store.Close
 		logger.Info("postgres connected")
 	}
@@ -104,9 +132,9 @@ func run() error {
 					logger.Error("redis close failed", "error", err)
 				}
 			}()
-			// Pass breaker to cache
-			// يتطلب 5 إخفاقات متتالية ليُفتح (Open)،
-			// ويبقى مفتوحاً لمدة 10 ثوانٍ (Cooldown) قبل أن يحاول مجدداً.
+			// Pass breaker to cache:
+			// Requires 5 consecutive failures to trip (Open),
+			// and remains open for a 10s cooldown before attempting probe requests.
 
 			redisBreaker := circuitbreaker.NewWithConfig(circuitbreaker.Config{
 				Threshold: cfg.RedisCircuitBreakerThreshold, // default 5
@@ -115,29 +143,11 @@ func run() error {
 			})
 			defer redisBreaker.Close()
 
-			// ثم مررناه إلى خدمة الكاش
+			// Wire circuit breaker into cache service
 			summaryCache = cache.NewProjectSummaryCache(redisClient, cfg.RedisCacheTTL, logger, redisBreaker)
 			deliveryStore = worker.NewRedisDeliveryStore(redisClient, 24*time.Hour)
 			logger.Info("redis enabled")
 		}
-	}
-
-	// --- Repos ---
-	var users domain.UserRepository
-	var authRepo domain.AuthRepository
-	var memberships domain.MembershipRepository
-	var quotas domain.QuotaRepository
-	if u, ok := projects.(domain.UserRepository); ok {
-		users = u
-	}
-	if a, ok := projects.(domain.AuthRepository); ok {
-		authRepo = a
-	}
-	if m, ok := projects.(domain.MembershipRepository); ok {
-		memberships = m
-	}
-	if q, ok := projects.(domain.QuotaRepository); ok {
-		quotas = q
 	}
 
 	// --- Event Broker ---
@@ -167,8 +177,8 @@ func run() error {
 
 	// --- Service ---
 	deps := service.Deps{
-		Projects: projects, Tasks: tasks, Users: users, Auth: authRepo,
-		Memberships: memberships, Quotas: quotas, Cache: summaryCache,
+		Projects: projects, Tasks: tasks, Summaries: summaries, Users: users, Auth: authRepo,
+		Memberships: memberships, Quotas: quotas, Audits: audits, Pinger: pinger, Cache: summaryCache,
 		Publisher:            eventBroker,
 		MaxProjectsPerUser:   cfg.MaxProjectsPerUser,
 		MaxMembersPerProject: cfg.MaxMembersPerProject,
@@ -214,12 +224,35 @@ func run() error {
 		logger.Info("standalone worker mode: skipping in-process worker (handled by external worker container)")
 	}
 
+	// --- Outbox Relay Processor ---
+	// Relays unpublished events from PostgreSQL outbox to EventBroker in the background
+	if outbox != nil && eventBroker != nil {
+		outboxProcessor := worker.NewOutboxProcessor(
+			outbox,
+			eventBroker,
+			logger,
+			worker.DefaultOutboxConfig(),
+		)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := outboxProcessor.Run(workerCtx); err != nil && !errors.Is(err, context.Canceled) {
+				logger.Error("outbox relay processor stopped with error", "error", err)
+			} else {
+				logger.Info("outbox relay processor stopped gracefully")
+			}
+		}()
+	}
+
 	// --- HTTP ---
 	var idempotencyStore cache.IdempotencyStore
 	if redisClient != nil {
 		idempotencyStore = cache.NewRedisIdempotencyStore(redisClient, 24*time.Hour)
 	}
-	api := handler.NewAPI(workhub, trustedProxies(cfg), idempotencyStore, logger)
+	api := handler.NewAPIWithConfig(workhub, trustedProxies(cfg), idempotencyStore, logger, handler.Config{
+		AuthRateLimit:            cfg.AuthRateLimit,
+		ProjectCreationRateLimit: cfg.ProjectCreationRateLimit,
+	})
 	authHandler := middleware.Authenticate(cfg.JWTSecret)(api.Routes())
 
 	// Add OTel HTTP middleware to trace all incoming requests
@@ -233,11 +266,11 @@ func run() error {
 	server := &http.Server{
 		Addr:              fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
 		Handler:           finalHandler,
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       15 * time.Second,
-		WriteTimeout:      30 * time.Second,
-		IdleTimeout:       60 * time.Second,
-		MaxHeaderBytes:    1 << 20,
+		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
+		ReadTimeout:       cfg.ReadTimeout,
+		WriteTimeout:      cfg.WriteTimeout,
+		IdleTimeout:       cfg.IdleTimeout,
+		MaxHeaderBytes:    cfg.MaxHeaderBytes,
 	}
 	// --- Internal Profiling Server (pprof on isolated admin port 6060) ---
 	if os.Getenv("ENABLE_PROFILING") == "true" || cfg.AppEnv != "production" {
@@ -336,11 +369,11 @@ func setupPool(cfg config.Config) (*pgxpool.Pool, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse db url: %w", err)
 	}
-	pgxCfg.MaxConns = 25
-	pgxCfg.MinConns = 5
-	pgxCfg.MaxConnLifetime = time.Hour
-	pgxCfg.MaxConnIdleTime = 30 * time.Minute
-	pgxCfg.HealthCheckPeriod = time.Minute
+	pgxCfg.MaxConns = int32(cfg.DBMaxConns)
+	pgxCfg.MinConns = int32(cfg.DBMinConns)
+	pgxCfg.MaxConnLifetime = cfg.DBMaxConnLifetime
+	pgxCfg.MaxConnIdleTime = cfg.DBMaxConnIdleTime
+	pgxCfg.HealthCheckPeriod = cfg.DBHealthCheckPeriod
 
 	pool, err := pgxpool.NewWithConfig(ctx, pgxCfg)
 	if err != nil {
@@ -377,69 +410,3 @@ func trustedProxies(cfg config.Config) map[string]struct{} {
 	}
 	return m
 }
-
-/*
-================================================================================
- النسخة المقابلة باستخدام إطار عمل Fiber (للمقارنة فقط - معلّقة ومظللة)
- FIBER EQUIVALENT IMPLEMENTATION (FOR COMPARISON ONLY - COMMENTED OUT)
-================================================================================
-
-import (
-	"context"
-	"fmt"
-	"time"
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/contrib/otelfiber"
-	"workhub-service/internal/handler"
-	"workhub-service/internal/infrastructure/cache"
-	"workhub-service/internal/middleware"
-)
-
-// setupFiberServer demonstrates how the HTTP layer is wired with Fiber:
-func setupFiberServer(cfg config.Config, api *handler.API, logger *slog.Logger) *fiber.App {
-	app := fiber.New(fiber.Config{
-		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		IdleTimeout:  60 * time.Second,
-		BodyLimit:    10 * 1024 * 1024,
-		DisableStartupMessage: true,
-	})
-
-	// 1. Tracing & Telemetry (OpenTelemetry)
-	app.Use(otelfiber.NewMiddleware(otelfiber.WithServerName("workhub-api")))
-
-	// 2. Core Middlewares
-	app.Use(middleware.RecoveryFiber(logger))
-	app.Use(middleware.RequestIDFiber())
-	app.Use(middleware.RequestLogFiber(logger))
-	app.Use(middleware.MetricsFiber())
-	app.Use(middleware.LoadSheddingFiber(cfg.MaxInFlight, logger))
-	app.Use(middleware.SecurityHeadersFiber(""))
-	app.Use(middleware.CORSFiber(cfg.AllowedOrigins))
-	app.Use(middleware.AuthenticateFiber(cfg.JWTSecret))
-
-	// 3. Register Routes
-	api.RegisterRoutesFiber(app)
-
-	return app
-}
-
-// Running and Graceful Shutdown with Fiber:
-//
-// app := setupFiberServer(cfg, api, logger)
-//
-// go func() {
-//     addr := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
-//     logger.Info("fiber server listening", "address", addr)
-//     if err := app.Listen(addr); err != nil {
-//         logger.Error("fiber server stopped", "error", err)
-//     }
-// }()
-//
-// <-quit
-// shutCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-// defer cancel()
-// if err := app.ShutdownWithContext(shutCtx); err != nil {
-//     logger.Error("fiber graceful shutdown error", "error", err)
-// }
-*/

@@ -10,8 +10,8 @@ TARGET_FILE="monitoring/grafana/dashboard.json"
 
 echo -e "${BOLD}========================================================================${NC}"
 echo -e "${CYAN}★ GRAFANA LIVE DASHBOARD WATCHER ACTIVE${NC}"
-echo -e "${BOLD}مراقبة التعديلات على: ${TARGET_FILE}${NC}"
-echo -e "أي تعديل وحفظ للملف (Ctrl + S) سيتم إرساله للداشبورد فوراً!"
+echo -e "${BOLD}Watching for changes in: ${TARGET_FILE}${NC}"
+echo -e "Any file edit & save (Ctrl + S) will be pushed to Grafana immediately!"
 echo -e "${BOLD}========================================================================${NC}"
 
 # Initial sync

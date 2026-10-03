@@ -95,5 +95,5 @@ else:
 
 rm -f /tmp/dash_payload.json
 echo -e "${GREEN}========================================================================${NC}"
-echo -e "${GREEN}★ تم حل مشكلة Datasource وتحديث لوحة التحكم بنجاح!${NC}"
+echo -e "${GREEN}★ Datasource verified and dashboard successfully synced!${NC}"
 echo -e "${GREEN}========================================================================${NC}"
