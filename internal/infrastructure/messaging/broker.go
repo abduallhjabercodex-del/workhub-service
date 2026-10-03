@@ -73,7 +73,7 @@ func (s *subscription) send(event domain.Event, ctx context.Context, maxRetry in
 func (s *subscription) close() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if !s.closed { //panicأغلق القناة فقط إذا لم تكن مغلقة مسبقًا."   وهاكذا منعنا استدعا اغلاق القناه مرتين  وتجنبنا ال
+	if !s.closed { // Close channel only if not closed already to prevent double-close panic
 		s.closed = true
 		close(s.ch)
 	}
@@ -107,15 +107,14 @@ func NewBrokerWithOptions(maxRetry, maxDead int) *Broker {
 	}
 }
 
-//  داله مفتوحه عامه تسمح للحزم الخارجيه بالقراءه الامنه    دون التعديل عليا والعبث بالحاله الداخليه لل بروكر
-
+// MaxRetry provides thread-safe access to configured retry limit.
 func (b *Broker) MaxRetry() int {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 	return b.maxRetry
 }
 
-// "يا Consumer، إذا كنت مهتمًا بـ eventType معين، اشترك عندي، وسأعطيك Channel تستقبل منها الأحداث، وأعطيك أيضًا دالة تستطيع بها إلغاء اشتراكك."
+// Subscribe registers a consumer channel for the specified eventType and returns an unsubscribe function.
 func (b *Broker) Subscribe(eventType string, buffer int) (<-chan domain.Event, func()) {
 	if buffer < 1 {
 		buffer = 16
@@ -126,15 +125,15 @@ func (b *Broker) Subscribe(eventType string, buffer int) (<-chan domain.Event, f
 
 	b.mu.Lock()
 	if b.closed {
-		// قد يكون Consumer حاول الاشتراك في نفس اللحظة التي تم فيها إغلاق الـ Broker.
+		// Handle race condition where broker was closed concurrently during subscription
 		sub.close()
 		b.mu.Unlock()
 		return sub.ch, func() {}
 	}
 	b.subs[eventType] = append(b.subs[eventType], sub)
-	b.mu.Unlock() // انتهينا من التعديل
+	b.mu.Unlock()
 
-	// أريد أن تكون عملية إلغاء الاشتراك آمنة حتى لو استُدعيت أكثر من مرة.
+	// Ensure idempotent unsubscribe using sync.Once
 	var unsubscribeOnce sync.Once
 	unsubscribe := func() {
 		unsubscribeOnce.Do(func() {
@@ -143,7 +142,7 @@ func (b *Broker) Subscribe(eventType string, buffer int) (<-chan domain.Event, f
 
 			subs, ok := b.subs[eventType]
 			if !ok {
-				sub.close() // subscription موجودة عند Consumer لكنها غير مسجلة في خريطة الـ Broker
+				sub.close()
 				return
 			}
 			for i, candidate := range subs {
@@ -205,7 +204,7 @@ func (b *Broker) AddDeadLetter(event domain.Event) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if len(b.dead) >= b.maxDead {
-		b.dead = b.dead[1:] // نحذف الأقدم:
+		b.dead = b.dead[1:] // Evict oldest entry when bounded capacity reached
 	}
 	b.dead = append(b.dead, event)
 }
@@ -213,7 +212,7 @@ func (b *Broker) AddDeadLetter(event domain.Event) {
 func (b *Broker) DeadLetters() []domain.Event {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	return append([]domain.Event(nil), b.dead...) // نسخة دفاعية.بنرجع نسخه من السلايس علا شان  المستدعي  مايقدر يعدل علا البيانات الاصليه
+	return append([]domain.Event(nil), b.dead...) // Defensive copy to prevent caller mutation
 }
 
 func (b *Broker) ClearDeadLetters() {
@@ -225,7 +224,7 @@ func (b *Broker) ClearDeadLetters() {
 func (b *Broker) Close() {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if b.closed { //منع استدعاء الاغلاق اكثر من مره
+	if b.closed { // Prevent double-close
 		return
 	}
 	b.closed = true

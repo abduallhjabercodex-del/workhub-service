@@ -44,10 +44,12 @@ func TestRedisFailureScenarios(t *testing.T) {
 	deps := service.Deps{
 		Projects:             repo,
 		Tasks:                repo,
+		Summaries:            repo,
 		Users:                repo,
 		Auth:                 repo,
 		Memberships:          repo,
 		Quotas:               repo,
+		Pinger:               repo,
 		Cache:                summaryCache,
 		MaxProjectsPerUser:   10,
 		MaxMembersPerProject: 10,

@@ -3,6 +3,7 @@ package domain
 import (
 	"context"
 	"errors"
+	"time"
 )
 
 var (
@@ -56,12 +57,12 @@ type MembershipRepository interface {
 	GetProjectMember(ctx context.Context, projectID, userID string) (Member, error)
 	ListProjectMembers(ctx context.Context, projectID string) ([]Member, error)
 	RemoveProjectMember(ctx context.Context, projectID, userID string) error
-	RemoveProjectMemberSafely(ctx context.Context, projectID, userID string) error // ← جديد: ذرّي
+	RemoveProjectMemberSafely(ctx context.Context, projectID, userID string) error // new: atomic
 }
 
-// QuotaRepository — تغيّر التوقيع: (quota, found, err)
+// QuotaRepository — signature: (quota, found, err)
 type QuotaRepository interface {
-	GetUserQuota(ctx context.Context, userID string) (UserQuota, bool, error) // ← bool جديد
+	GetUserQuota(ctx context.Context, userID string) (UserQuota, bool, error) // new: found bool
 	SetUserQuota(ctx context.Context, quota UserQuota) error
 }
 
@@ -70,7 +71,18 @@ type TaskAuditRepository interface {
 	CreateTaskWithAudit(context.Context, Task, AuditEvent) (Task, error)
 }
 
-// Pinger — نُقل إلى domain (كان في service)
+// Pinger — moved to domain (formerly in service)
 type Pinger interface {
 	Ping(context.Context) error
+}
+
+type AuditRepository interface {
+	ListProjectAuditEvents(ctx context.Context, projectID string, limit, offset int) ([]AuditEvent, int, error)
+	RecordAuditEvent(ctx context.Context, event AuditEvent) error
+}
+
+type OutboxRepository interface {
+	FetchUnpublishedOutboxEvents(ctx context.Context, batchSize int) ([]OutboxRecord, error)
+	MarkOutboxEventPublished(ctx context.Context, id int64) error
+	MarkOutboxEventFailed(ctx context.Context, id int64, lastErr string, nextRetry time.Duration) error
 }

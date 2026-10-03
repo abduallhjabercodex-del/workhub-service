@@ -24,10 +24,12 @@ func TestRateLimiting(t *testing.T) {
 	deps := service.Deps{
 		Projects:             repo,
 		Tasks:                repo,
+		Summaries:            repo,
 		Users:                repo,
 		Auth:                 repo,
 		Memberships:          repo,
 		Quotas:               repo,
+		Pinger:               repo,
 		MaxProjectsPerUser:   20,
 		MaxMembersPerProject: 20,
 		MaxTasksPerProject:   20,

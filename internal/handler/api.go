@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
 	"log/slog"
 	"workhub-service/internal/domain"
 	"workhub-service/internal/infrastructure/cache"
@@ -17,20 +16,46 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
+type Config struct {
+	AuthRateLimit            int
+	ProjectCreationRateLimit int
+}
+
 type API struct {
 	workhub                *service.WorkHub
 	trustedProxies         map[string]struct{}
 	projectCreationLimiter *middleware.RateLimiterStore
+	authLimiter            *middleware.RateLimiterStore
 	idempotencyStore       cache.IdempotencyStore
 	logger                 *slog.Logger
 	health                 *AppHealth
 }
 
 func NewAPI(workhub *service.WorkHub, trustedProxies map[string]struct{}, idempotencyStore cache.IdempotencyStore, logger *slog.Logger) *API {
+	return NewAPIWithConfig(workhub, trustedProxies, idempotencyStore, logger, Config{
+		AuthRateLimit:            5,
+		ProjectCreationRateLimit: 10,
+	})
+}
+
+func NewAPIWithConfig(workhub *service.WorkHub, trustedProxies map[string]struct{}, idempotencyStore cache.IdempotencyStore, logger *slog.Logger, cfg Config) *API {
+	projLimit := cfg.ProjectCreationRateLimit
+	if projLimit <= 0 {
+		projLimit = 10
+	}
+	authLimit := cfg.AuthRateLimit
+	if authLimit <= 0 {
+		authLimit = 5
+	}
+
+	projInterval := time.Minute / time.Duration(projLimit)
+	authInterval := time.Minute / time.Duration(authLimit)
+
 	return &API{
 		workhub:                workhub,
 		trustedProxies:         trustedProxies,
-		projectCreationLimiter: middleware.NewRateLimiter(10, 6*time.Second), // 10 per minute
+		projectCreationLimiter: middleware.NewRateLimiter(projLimit, projInterval),
+		authLimiter:            middleware.NewRateLimiter(authLimit, authInterval),
 		idempotencyStore:       idempotencyStore,
 		logger:                 logger,
 		health:                 NewAppHealth(),
@@ -54,32 +79,48 @@ func (a *API) Routes() http.Handler {
 	mux.Handle("/api/v1/docs/assets/", http.StripPrefix("/api/v1/docs/", ServeSwaggerAssets()))
 
 	// Auth endpoints (public with rate limit)
-	authLimiter := middleware.NewRateLimiter(5, 12*time.Second)
-	authHandler := middleware.RateLimit(authLimiter, a.trustedProxies)
+	authHandler := middleware.RateLimit(a.authLimiter, a.trustedProxies)
 
 	mux.Handle("/api/v1/auth/register", authHandler(http.HandlerFunc(a.register)))
 	mux.Handle("/api/v1/auth/login", authHandler(http.HandlerFunc(a.login)))
 	mux.Handle("/api/v1/auth/refresh", authHandler(http.HandlerFunc(a.refresh)))
 	mux.Handle("/api/v1/auth/logout", authHandler(http.HandlerFunc(a.logout)))
 
-	// Protected endpoints — نطبّق RequireAuth لكل مسار
+	// Protected endpoints — apply RequireAuth for each route
 	requireAuth := middleware.RequireAuth
+	idempotency := middleware.Idempotency(a.idempotencyStore, a.logger)
+
+	protect := func(h http.HandlerFunc) http.Handler {
+		return requireAuth(idempotency(h))
+	}
 
 	mux.Handle("/api/v1/auth/me", requireAuth(http.HandlerFunc(a.me)))
 
-	idempotency := middleware.Idempotency(a.idempotencyStore, a.logger)
+	// Projects
+	mux.Handle("GET /api/v1/projects", protect(a.listProjects))
+	mux.Handle("POST /api/v1/projects", protect(a.createProject))
+	mux.Handle("GET /api/v1/projects/{id}", protect(a.getProject))
+	mux.Handle("DELETE /api/v1/projects/{id}", protect(a.deleteProject))
 
-	projectsHandler := requireAuth(idempotency(http.HandlerFunc(a.projects)))
-	mux.Handle("/api/v1/projects", projectsHandler)
+	// Project Subresources
+	mux.Handle("GET /api/v1/projects/{id}/summary", protect(a.getProjectSummary))
+	mux.Handle("GET /api/v1/projects/{id}/audit", protect(a.listProjectAudit))
+	mux.Handle("GET /api/v1/projects/{id}/members", protect(a.listProjectMembers))
+	mux.Handle("POST /api/v1/projects/{id}/members", protect(a.addProjectMember))
+	mux.Handle("DELETE /api/v1/projects/{id}/members/{userId}", protect(a.removeProjectMember))
 
-	projectSubresourceHandler := requireAuth(idempotency(http.HandlerFunc(a.projectSubresource)))
-	mux.Handle("/api/v1/projects/", projectSubresourceHandler)
+	// Project Tasks
+	mux.Handle("GET /api/v1/projects/{id}/tasks", protect(a.listProjectTasks))
+	mux.Handle("POST /api/v1/projects/{id}/tasks", protect(a.createProjectTask))
 
-	tasksHandler := requireAuth(idempotency(http.HandlerFunc(a.taskByID)))
-	mux.Handle("/api/v1/tasks/", tasksHandler)
-	// globalTasks: أُزيل لأن ListTasks يفرض projectID.
+	// Tasks
+	mux.Handle("GET /api/v1/tasks/{id}", protect(a.getTask))
+	mux.Handle("PATCH /api/v1/tasks/{id}", protect(a.updateTask))
+	mux.Handle("DELETE /api/v1/tasks/{id}", protect(a.deleteTask))
 
-	mux.Handle("/api/v1/quotas/", requireAuth(http.HandlerFunc(a.userQuotas)))
+	// Quotas
+	mux.Handle("GET /api/v1/quotas/{id}", requireAuth(http.HandlerFunc(a.getUserQuota)))
+	mux.Handle("PUT /api/v1/quotas/{id}", requireAuth(http.HandlerFunc(a.setUserQuota)))
 
 	return mux
 }
@@ -117,6 +158,10 @@ func writeServiceError(w http.ResponseWriter, r *http.Request, err error) {
 		status, code, message = http.StatusNotFound, "project_not_found", "project not found"
 	case errors.Is(err, service.ErrTaskNotFound):
 		status, code, message = http.StatusNotFound, "task_not_found", "task not found"
+	case errors.Is(err, service.ErrUserNotFound):
+		status, code, message = http.StatusNotFound, "user_not_found", "user not found"
+	case errors.Is(err, service.ErrNotFound):
+		status, code, message = http.StatusNotFound, "not_found", "resource not found"
 	case errors.Is(err, service.ErrUserAlreadyExists):
 		status, code, message = http.StatusConflict, "user_already_exists", "user with this email already exists"
 	case errors.Is(err, service.ErrInvalidCredentials):
@@ -161,118 +206,23 @@ func methodNotAllowed(w http.ResponseWriter, methods ...string) {
 		Code: "method_not_allowed", Message: "method not allowed"}})
 }
 
-// requestID — يقرأ من context، لا من header.
+// requestID — reads from context, not from header.
 func requestID(r *http.Request) string {
 	return middleware.RequestIDFromContext(r.Context())
 }
 
-/*
-================================================================================
- النسخة المقابلة باستخدام إطار عمل Fiber (للمقارنة فقط - معلّقة ومظللة)
- FIBER EQUIVALENT IMPLEMENTATION (FOR COMPARISON ONLY - COMMENTED OUT)
-================================================================================
-
-import (
-	"errors"
-	"fmt"
-	"time"
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/filesystem"
-	"workhub-service/internal/domain"
-	"workhub-service/internal/middleware"
-	"workhub-service/internal/service"
-)
-
-// RegisterRoutesFiber configures all application routes on a *fiber.App
-func (a *API) RegisterRoutesFiber(app *fiber.App) {
-	// Public & Health
-	app.Get("/health", HealthFiber)
-	app.Get("/ready", a.ReadyFiber)
-	app.Get("/startup", a.StartupFiber)
-	app.Get("/api/v1/docs", ServeSwaggerUIFiber)
-	app.Get("/api/v1/docs/openapi.yaml", ServeOpenAPISpecFiber)
-	app.Use("/api/v1/docs/assets", filesystem.New(filesystem.Config{
-		Root:   http.FS(swaggerAssets),
-		PathPrefix: "assets",
-	}))
-
-	// API Group
-	api := app.Group("/api/v1")
-
-	// Auth (Public with rate limiter)
-	auth := api.Group("/auth", middleware.RateLimitFiber(5, 12*time.Second, a.trustedProxies))
-	auth.Post("/register", a.registerFiber)
-	auth.Post("/login", a.loginFiber)
-	auth.Post("/refresh", a.refreshFiber)
-	auth.Post("/logout", a.logoutFiber)
-
-	// Protected routes
-	protected := api.Group("", middleware.RequireAuthFiber)
-	protected.Get("/auth/me", a.meFiber)
-
-	// Projects
-	idempotency := middleware.IdempotencyFiber(a.idempotencyStore, a.logger)
-	projects := protected.Group("/projects", idempotency)
-	projects.Get("/", a.listProjectsFiber)
-	projects.Post("/", a.createProjectFiber)
-	projects.Get("/:id", a.getProjectFiber)
-	projects.Delete("/:id", a.deleteProjectFiber)
-	projects.Get("/:id/summary", a.getProjectSummaryFiber)
-	projects.Get("/:id/members", a.listProjectMembersFiber)
-	projects.Post("/:id/members", a.addProjectMemberFiber)
-	projects.Delete("/:id/members/:userId", a.removeProjectMemberFiber)
-
-	// Project Tasks
-	projects.Get("/:id/tasks", a.listTasksFiber)
-	projects.Post("/:id/tasks", a.createTaskFiber)
-
-	// Standalone Task Operations
-	tasks := protected.Group("/tasks", idempotency)
-	tasks.Get("/:id", a.getTaskFiber)
-	tasks.Patch("/:id", a.updateTaskFiber)
-	tasks.Delete("/:id", a.deleteTaskFiber)
-
-	// Quotas
-	protected.Get("/quotas/:id", a.getUserQuotaFiber)
-	protected.Put("/quotas/:id", a.putUserQuotaFiber)
-}
-
-func writeServiceErrorFiber(c *fiber.Ctx, err error) error {
-	reqID := middleware.RequestIDFromFiber(c)
-	var quotaErr *domain.QuotaError
-	if errors.As(err, &quotaErr) || errors.Is(err, domain.ErrQuotaExceeded) {
-		message := "Resource quota exceeded"
-		if quotaErr != nil {
-			message = fmt.Sprintf("Quota exceeded for %s: current count %d reaches maximum allowed %d",
-				quotaErr.Resource, quotaErr.Current, quotaErr.Max)
+func pathParam(r *http.Request, key string, fallbackPrefix string) string {
+	if val := r.PathValue(key); val != "" {
+		return val
+	}
+	if fallbackPrefix != "" {
+		trimmed := strings.TrimPrefix(r.URL.Path, fallbackPrefix)
+		if idx := strings.Index(trimmed, "/"); idx != -1 {
+			trimmed = trimmed[:idx]
 		}
-		return c.Status(fiber.StatusForbidden).JSON(envelope{
-			Error: &apiError{Code: "QUOTA_EXCEEDED", Message: message, RequestID: reqID},
-		})
+		return strings.TrimSpace(trimmed)
 	}
-
-	status, code, message := fiber.StatusInternalServerError, "internal_error", "internal server error"
-	switch {
-	case errors.Is(err, service.ErrInvalidInput):
-		status, code, message = fiber.StatusBadRequest, "invalid_input", "request validation failed"
-	case errors.Is(err, service.ErrProjectNotFound):
-		status, code, message = fiber.StatusNotFound, "project_not_found", "project not found"
-	case errors.Is(err, service.ErrTaskNotFound):
-		status, code, message = fiber.StatusNotFound, "task_not_found", "task not found"
-	case errors.Is(err, service.ErrUserAlreadyExists):
-		status, code, message = fiber.StatusConflict, "user_already_exists", "user with this email already exists"
-	case errors.Is(err, service.ErrInvalidCredentials):
-		status, code, message = fiber.StatusUnauthorized, "invalid_credentials", "invalid email or password"
-	case errors.Is(err, service.ErrUnauthorized):
-		status, code, message = fiber.StatusUnauthorized, "unauthorized", "unauthorized"
-	case errors.Is(err, service.ErrForbidden):
-		status, code, message = fiber.StatusForbidden, "forbidden", "forbidden: insufficient permissions or membership"
-	case errors.Is(err, service.ErrTokenExpired):
-		status, code, message = fiber.StatusUnauthorized, "token_expired", "token has expired"
-	}
-
-	return c.Status(status).JSON(envelope{
-		Error: &apiError{Code: code, Message: message, RequestID: reqID},
-	})
+	return ""
 }
-*/
+
+

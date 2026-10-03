@@ -6,8 +6,8 @@ import (
 	"os"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace" // أي بدل إرسالها إلى Jaeger أو OTLP collector، ستظهر في terminal/log output.
-	"go.opentelemetry.io/otel/sdk/resource"                 // من هو التطبيق الذي أنتج هذه telemetry؟
+	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace" // Outputs spans to stdout/terminal instead of remote collector
+	"go.opentelemetry.io/otel/sdk/resource"                 // Identifies service resource attributes
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 	"go.opentelemetry.io/otel/trace"
@@ -21,7 +21,7 @@ func InitTracer() (func(context.Context) error, error) {
 	}
 
 	exporter, err := stdouttrace.New(
-		stdouttrace.WithPrettyPrint(), // يجعل output مقروءًا للإنسان بدل شكل compact.
+		stdouttrace.WithPrettyPrint(), // Human-readable formatted JSON trace output
 	)
 	if err != nil {
 		return nil, fmt.Errorf("creating stdout exporter: %w", err)
@@ -40,12 +40,12 @@ func InitTracer() (func(context.Context) error, error) {
 	}
 
 	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exporter), // يتم تجميع spans ثم إرسالها على دفعات:
-		sdktrace.WithResource(res),     // كل traces/spans التي ينتجها هذا provider مرتبطة بهذه الـ resource information.
+		sdktrace.WithBatcher(exporter), // Batch spans asynchronously
+		sdktrace.WithResource(res),     // Associate provider with service resource metadata
 	)
-	otel.SetTracerProvider(tp) //  الآن جعلنا هذا الـ provider هو الـ global provider.
+	otel.SetTracerProvider(tp) // Register provider as the global tracer provider
 
-	return tp.Shutdown, nil //
+	return tp.Shutdown, nil
 }
 
 // Tracer returns the global tracer for the application.

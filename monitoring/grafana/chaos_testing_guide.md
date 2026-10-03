@@ -1,28 +1,28 @@
-# هندسة الفوضى (Chaos Engineering) - WorkHub
+# Chaos Engineering - WorkHub
 
-هذا الملف يحتوي على سيناريوهات جاهزة لاختبار مرونة النظام (Resilience) ومراقبة لوحة تحكم Grafana وكيفية تفاعلها مع الأعطال والضغط الشديد.
+This document contains actionable scenarios to test system resilience and observe Grafana dashboard behavior during failures and high traffic loads.
 
-## 1. هجوم زيارات مفاجئ (Spike Traffic) 🚀
-هذا الاختبار يهدف إلى إغراق السيرفر بطلبات سريعة وخفيفة لملاحظة سرعة الاستجابة وارتفاع معدل الطلبات الكلي في الداشبورد.
+## 1. Spike Traffic 🚀
+Floods the server with rapid, lightweight requests to monitor latency responsiveness and overall throughput increase on the dashboard.
 
-**الهدف في Grafana:**
-- إضاءة مؤشر **`API Request Rate`**.
-- إضاءة مؤشر **`DB Queries Rate`**.
+**Target in Grafana:**
+- Spikes **`API Request Rate`**.
+- Spikes **`DB Queries Rate`**.
 
-**الأمر:**
+**Command:**
 ```bash
 for i in {1..500}; do curl -s -X GET http://localhost:8080/health > /dev/null & done; wait
 ```
 
 ---
 
-## 2. هجوم الأخطاء 4xx و 5xx (Error Storm) 💥
-هذا الاختبار يقوم بإرسال طلبات مكثفة إلى مسارات غير موجودة أو مسارات تتطلب صلاحيات غير متوفرة، مما يرفع نسبة الأخطاء.
+## 2. Error Storm (4xx and 5xx) 💥
+Sends heavy bursts of requests to non-existent or unauthorized routes to trigger error metrics.
 
-**الهدف في Grafana:**
-- ارتفاع حاد في مؤشر **`API Error Rate`** باللونين الأصفر (4xx) والأحمر (5xx).
+**Target in Grafana:**
+- Sharp rise in **`API Error Rate`** with yellow (4xx) and red (5xx) thresholds.
 
-**الأمر:**
+**Command:**
 ```bash
 for i in {1..100}; do 
   curl -s -X GET http://localhost:8080/api/v1/projects/999999 > /dev/null & 
@@ -32,13 +32,13 @@ done; wait
 
 ---
 
-## 3. محاكاة بطء السيرفر (Latency Spike) 🐢
-يتم إرسال طلبات تتطلب معالجة ثقيلة جداً من المعالج (CPU). في حالتنا، سنقوم بإرسال طلبات تسجيل دخول وهمية بشكل متزامن، لأن عملية تشفير كلمة المرور (Bcrypt) تستهلك وقتاً وموارداً عالية بطبيعتها.
+## 3. Latency Spike Simulation 🐢
+Sends requests requiring heavy CPU computation (e.g. concurrent login attempts involving bcrypt password hashing).
 
-**الهدف في Grafana:**
-- قفزة عالية في مؤشر **`API Latency P95`** (قد تصل إلى ثانية أو أكثر للطلب الواحد).
+**Target in Grafana:**
+- Spike in **`API Latency P95`** (approaching 1s or more per request).
 
-**الأمر:**
+**Command:**
 ```bash
 for i in {1..30}; do 
   curl -s -X POST http://localhost:8080/api/v1/auth/login \
@@ -49,34 +49,33 @@ done; wait
 
 ---
 
-## 4. اختبار قاطع الدورة (Cache Circuit Breaker) 🔌
-يحاكي هذا الاختبار سقوط أو انهيار خادم التخزين المؤقت (Redis) فجأة، لضمان أن النظام قادر على اكتشاف العطل وعزل الكاش تلقائياً لحماية قاعدة البيانات الأساسية.
+## 4. Cache Circuit Breaker Drill 🔌
+Simulates sudden Redis cache failure to verify the system detects failure and fails open gracefully to the database.
 
-**الهدف في Grafana:**
-- تحول مؤشر **`Cache Circuit Breaker State`** من `0` (أخضر) إلى `2` (أحمر) للإشارة إلى أن الدائرة فُتحت وتم تجاوز الكاش.
+**Target in Grafana:**
+- **`Cache Circuit Breaker State`** transitions from `0` (Green / CLOSED) to `2` (Red / OPEN), indicating circuit tripped and bypassing Redis.
 
-**الأمر (لإسقاط Redis):**
+**Command (to stop Redis):**
 ```bash
-sudo systemctl stop redis-server
+docker stop workhub_redis
 ```
-*(حاول استخدام واجهة النظام أو إرسال طلبات كثيرة بعد هذا الأمر لملاحظة تغير حالة القاطع)*.
+*(Send cache requests to trip the circuit threshold)*.
 
-**الأمر (لإنعاش Redis وإعادته للعمل):**
+**Command (to recover Redis):**
 ```bash
-sudo systemctl start redis-server
+docker start workhub_redis
 ```
-*(ستلاحظ أن القاطع يتحول إلى `1` أي نصف-مفتوح للاختبار، ثم `0` للعودة للعمل الطبيعي).*
+*(Circuit transitions to `1` HALF-OPEN for probing, then resets to `0` CLOSED once healthy).*
 
 ---
 
-## 5. خنق السيرفر واختبار درع الحماية (Load Shedding & Bulkhead) 🛡️
-هذا الاختبار يرسل عدداً هائلاً من الطلبات في نفس اللحظة لمحاولة تجاوز الحد الأقصى (Max In-Flight Requests) المسموح به للسيرفر، مما يجبره على التخلص من بعض الطلبات.
+## 5. Load Shedding & Bulkhead Protection 🛡️
+Sends massive concurrency bursts exceeding maximum allowed in-flight requests, forcing graceful rejection.
 
-**الهدف في Grafana:**
-- إضاءة مؤشر **`Load Shedding / Bulkhead Rejections`** لتسجيل عدد الطلبات التي تم رفضها لإنقاذ السيرفر.
+**Target in Grafana:**
+- **`Load Shedding / Bulkhead Rejections`** panel increments to record shedding events.
 
-**الأمر:**
+**Command:**
 ```bash
-# نرسل 2000 طلب في نفس اللحظة (تأكد من تعديل MaxInFlight في إعدادات السيرفر إلى رقم أقل مثل 50 لتسريع ظهور النتيجة)
 for i in {1..2000}; do curl -s http://localhost:8080/health > /dev/null & done; wait
 ```

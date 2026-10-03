@@ -34,10 +34,10 @@ type Handler func(context.Context, domain.Event) error
 //   - The queue channel is NEVER closed to avoid a race with Submit.
 type WorkerPool struct {
 	workers   int
-	queueSize int // عدد المهام التي ممكن ان تنتظر
+	queueSize int // maximum number of pending tasks
 	queue     chan domain.Event
 	wg        sync.WaitGroup
-	quit      chan struct{} // اغلاق ال pool
+	quit      chan struct{} // pool shutdown channel
 	stopOnce  sync.Once
 }
 
@@ -113,10 +113,10 @@ func (p *WorkerPool) Submit(ctx context.Context, event domain.Event) error {
 		return ErrPoolStopped
 	case <-ctx.Done():
 		return ctx.Err()
-	case p.queue <- event: //  نجح الوضع
+	case p.queue <- event: // successfully enqueued
 		return nil
-	default: // الطابور ممتلئ!
-		return ErrQueueFull //  فشل الوضع، طابور ممتلئ   Backpressure
+	default: // queue is full
+		return ErrQueueFull // queue is full, apply backpressure
 	}
 }
 

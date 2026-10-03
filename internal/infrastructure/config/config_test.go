@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// TestLoadValidation يختبر عملية التحقق من صحة الإعدادات عند تحميلة من المتغيرات البيئية (القيم الافتراضية، القيم المخصصة، والمنافذ أو المهلات غير الصالحة).
+// TestLoadValidation verifies configuration validation against environment variables (defaults, custom, invalid values).
 func TestLoadValidation(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -34,7 +34,7 @@ func TestLoadValidation(t *testing.T) {
 	}
 }
 
-// TestLoadDoesNotDependOnProcessEnvironment يختبر التحميل الافتراضي للإعدادات للتأكد من استخدام القيم الافتراضية (مثل 127.0.0.1:8080) عند غياب متغيرات البيئة.
+// TestLoadDoesNotDependOnProcessEnvironment verifies default configuration values when env vars are unset.
 func TestLoadDoesNotDependOnProcessEnvironment(t *testing.T) {
 	for _, key := range []string{"HOST", "PORT", "REQUEST_TIMEOUT"} {
 		os.Unsetenv(key)

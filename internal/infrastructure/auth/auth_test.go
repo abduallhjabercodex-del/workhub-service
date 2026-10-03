@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// TestPasswordHashingAndVerification يختبر تجزئة (hashing) كلمة المرور والتحقق من المطابقة مع كلمة المرور الصحيحة والخاطئة.
+// TestPasswordHashingAndVerification tests bcrypt password hashing and verification against correct and incorrect passwords.
 func TestPasswordHashingAndVerification(t *testing.T) {
 	password := "SecretP@ss123"
 	hash, err := HashPassword(password, 10)
@@ -20,7 +20,7 @@ func TestPasswordHashingAndVerification(t *testing.T) {
 	}
 }
 
-// TestJWTGenerationValidationAndExpiry يختبر إنشاء رموز الوصول (JWT Access Token)، والتحقق من بياناتها (claims)، واكتشاف المفاتيح السرية الخاطئة، والتأكد من التعامل مع الرموز المنتهية الصلاحية.
+// TestJWTGenerationValidationAndExpiry tests JWT access token generation, claims validation, invalid secret rejection, and expiry handling.
 func TestJWTGenerationValidationAndExpiry(t *testing.T) {
 	secret := "test-secret-key"
 	userID := "101"
@@ -54,7 +54,7 @@ func TestJWTGenerationValidationAndExpiry(t *testing.T) {
 	}
 }
 
-// TestGenerateOpaqueTokenAndHash يختبر إنشاء الرموز العتمة (Opaque Refresh Tokens) وتوليد التجزئة الخاص بها (HashToken) والتأكد من مطابقتها.
+// TestGenerateOpaqueTokenAndHash tests generation of opaque refresh tokens and corresponding SHA256 hashes.
 func TestGenerateOpaqueTokenAndHash(t *testing.T) {
 	token, hash, err := GenerateOpaqueToken()
 	if err != nil {

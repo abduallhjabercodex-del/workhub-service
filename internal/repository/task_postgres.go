@@ -30,12 +30,18 @@ func (r *PostgresRepository) CreateTask(ctx context.Context, t domain.Task) (dom
 	if t.CreatedAt.IsZero() {
 		t.CreatedAt = time.Now().UTC()
 	}
+	var assigneeParam *int64
+	if t.AssigneeID != nil && *t.AssigneeID != "" {
+		if parsed, err := parseID(*t.AssigneeID); err == nil {
+			assigneeParam = &parsed
+		}
+	}
 	var id int64
 	stop := metrics.ObserveDBQuery("INSERT", "tasks")
 	err = r.pool.QueryRow(ctx, `
-		INSERT INTO tasks (project_id, created_by, title, status, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $5)
-		RETURNING id`, projectID, createdBy, t.Title, t.Status, t.CreatedAt).Scan(&id)
+		INSERT INTO tasks (project_id, created_by, assignee_id, title, status, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $6)
+		RETURNING id`, projectID, createdBy, assigneeParam, t.Title, t.Status, t.CreatedAt).Scan(&id)
 	stop(&err)
 	if err != nil {
 		return domain.Task{}, mapDBError(err)
@@ -77,8 +83,8 @@ func (r *PostgresRepository) CreateTaskWithQuota(
 
 	stopLock := metrics.ObserveDBQuery("SELECT_LOCK", "tasks")
 	_, errLock := tx.Exec(ctx,
-		`SELECT pg_advisory_xact_lock(hashtext('quota:tasks')::int, $1::int)`,
-		projectID,
+		`SELECT pg_advisory_xact_lock(hashtext('quota:tasks')::int, hashtext($1::text)::int)`,
+		strconv.FormatInt(projectID, 10),
 	)
 	stopLock(&errLock)
 	if errLock != nil {
@@ -102,12 +108,19 @@ func (r *PostgresRepository) CreateTaskWithQuota(
 		}
 	}
 
+	var assigneeParam *int64
+	if t.AssigneeID != nil && *t.AssigneeID != "" {
+		if parsed, err := parseID(*t.AssigneeID); err == nil {
+			assigneeParam = &parsed
+		}
+	}
+
 	var id int64
 	stopInsert := metrics.ObserveDBQuery("INSERT", "tasks")
 	errInsert := tx.QueryRow(ctx, `
-		INSERT INTO tasks (project_id, created_by, title, status, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $5)
-		RETURNING id`, projectID, createdBy, t.Title, t.Status, t.CreatedAt).Scan(&id)
+		INSERT INTO tasks (project_id, created_by, assignee_id, title, status, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $6)
+		RETURNING id`, projectID, createdBy, assigneeParam, t.Title, t.Status, t.CreatedAt).Scan(&id)
 	stopInsert(&errInsert)
 	if errInsert != nil {
 		return domain.Task{}, mapDBError(errInsert)
@@ -201,8 +214,11 @@ func (r *PostgresRepository) ListTasks(
 	offset := (page - 1) * limit
 
 	orderCol, ok := allowedTaskSort[sortBy]
-	if !ok || sortBy == "" {
-		orderCol = "created_at"
+	if sortBy == "" {
+		orderCol, ok = "created_at", true
+	}
+	if !ok {
+		return nil, 0, ErrInvalidSort
 	}
 	orderDir := "DESC"
 	if sortBy == "title" {
@@ -221,7 +237,7 @@ func (r *PostgresRepository) ListTasks(
 			WHERE project_id = $1
 			  AND deleted_at IS NULL
 			  AND ($2 = '' OR status = $2)
-			  AND ($3 = '' OR title ILIKE '%%' || $3 || '%%' ESCAPE '\')`,
+			  AND ($3 = '' OR title ILIKE '%' || $3 || '%' ESCAPE '\')`,
 			pid, status, search,
 		).Scan(&total)
 		stopCount(&errCount)
@@ -231,7 +247,7 @@ func (r *PostgresRepository) ListTasks(
 
 		stopList := metrics.ObserveDBQuery("SELECT", "tasks")
 		rows, err := r.pool.Query(innerCtx, fmt.Sprintf(`
-			SELECT id, project_id, created_by, title, status, created_at
+			SELECT id, project_id, created_by, assignee_id, title, status, created_at
 			FROM tasks
 			WHERE project_id = $1
 			  AND deleted_at IS NULL
@@ -251,12 +267,17 @@ func (r *PostgresRepository) ListTasks(
 		for rows.Next() {
 			var t domain.Task
 			var id, rowProjectID, createdBy int64
-			if err := rows.Scan(&id, &rowProjectID, &createdBy, &t.Title, &t.Status, &t.CreatedAt); err != nil {
+			var assigneeID *int64
+			if err := rows.Scan(&id, &rowProjectID, &createdBy, &assigneeID, &t.Title, &t.Status, &t.CreatedAt); err != nil {
 				return err
 			}
 			t.ID = strconv.FormatInt(id, 10)
 			t.ProjectID = strconv.FormatInt(rowProjectID, 10)
 			t.CreatedBy = strconv.FormatInt(createdBy, 10)
+			if assigneeID != nil {
+				assigneeStr := strconv.FormatInt(*assigneeID, 10)
+				t.AssigneeID = &assigneeStr
+			}
 			items = append(items, t)
 		}
 		return rows.Err()
@@ -279,11 +300,12 @@ func (r *PostgresRepository) GetTask(ctx context.Context, id string) (domain.Tas
 	}
 	var t domain.Task
 	var numericID, projectID, createdBy int64
+	var assigneeID *int64
 	stop := metrics.ObserveDBQuery("SELECT", "tasks")
 	err = r.pool.QueryRow(ctx, `
-		SELECT id, project_id, created_by, title, status, created_at
+		SELECT id, project_id, created_by, assignee_id, title, status, created_at
 		FROM tasks WHERE id = $1 AND deleted_at IS NULL`, taskID).
-		Scan(&numericID, &projectID, &createdBy, &t.Title, &t.Status, &t.CreatedAt)
+		Scan(&numericID, &projectID, &createdBy, &assigneeID, &t.Title, &t.Status, &t.CreatedAt)
 	stop(&err)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.Task{}, ErrNotFound
@@ -294,6 +316,10 @@ func (r *PostgresRepository) GetTask(ctx context.Context, id string) (domain.Tas
 	t.ID = strconv.FormatInt(numericID, 10)
 	t.ProjectID = strconv.FormatInt(projectID, 10)
 	t.CreatedBy = strconv.FormatInt(createdBy, 10)
+	if assigneeID != nil {
+		assigneeStr := strconv.FormatInt(*assigneeID, 10)
+		t.AssigneeID = &assigneeStr
+	}
 	return t, nil
 }
 
@@ -302,10 +328,16 @@ func (r *PostgresRepository) UpdateTask(ctx context.Context, t domain.Task) (dom
 	if err != nil {
 		return domain.Task{}, ErrNotFound
 	}
+	var assigneeParam *int64
+	if t.AssigneeID != nil && *t.AssigneeID != "" {
+		if parsed, err := parseID(*t.AssigneeID); err == nil {
+			assigneeParam = &parsed
+		}
+	}
 	stop := metrics.ObserveDBQuery("UPDATE", "tasks")
 	command, err := r.pool.Exec(ctx, `
-		UPDATE tasks SET title = $2, status = $3, updated_at = now()
-		WHERE id = $1 AND deleted_at IS NULL`, id, t.Title, t.Status)
+		UPDATE tasks SET title = $2, status = $3, assignee_id = $4, updated_at = now()
+		WHERE id = $1 AND deleted_at IS NULL`, id, t.Title, t.Status, assigneeParam)
 	stop(&err)
 	if err != nil {
 		return domain.Task{}, mapDBError(err)

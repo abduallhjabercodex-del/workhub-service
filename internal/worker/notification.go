@@ -53,7 +53,7 @@ func (w *NotificationWorker) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case event, ok := <-ch:
-			if !ok { // ok == false يعني أن Channel أغلقت.
+			if !ok { // ok == false means channel is closed.
 				return nil
 			}
 			if err := w.pool.Submit(ctx, event); err != nil {
@@ -168,7 +168,7 @@ func (n LogNotifier) NotifyTaskCreated(_ context.Context, event domain.Event) er
 	return nil
 }
 
-type MemoryNotifier struct { //صممناه لمساعدتنا في الاختبارات.
+type MemoryNotifier struct { // in-memory implementation for testing
 	mu       sync.Mutex
 	Events   []domain.Event
 	Failures int

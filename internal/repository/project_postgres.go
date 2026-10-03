@@ -12,11 +12,14 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-const listProjectsSQL = `
+// listProjectsSQLBase is the query without ORDER BY. The ORDER BY
+// and pagination clauses are appended at runtime using a whitelisted
+// column and hardcoded direction — never user input.
+const listProjectsSQLBase = `
 SELECT p.id, p.owner_user_id, p.name, p.created_at
 FROM projects p
 WHERE p.deleted_at IS NULL
-  AND ($1 = '' OR p.name ILIKE '%%' || $1 || '%%' ESCAPE '\')
+  AND ($1 = '' OR p.name ILIKE '%' || $1 || '%' ESCAPE '\')
   AND (
         $2::bigint IS NULL
      OR p.owner_user_id = $2
@@ -28,8 +31,6 @@ WHERE p.deleted_at IS NULL
             AND m.removed_at IS NULL
      )
   )
-ORDER BY %s
-LIMIT $3 OFFSET $4
 `
 
 // CreateProject — ينشئ مشروعًا بمالك صريح. لا Quota.
@@ -68,8 +69,8 @@ func (r *PostgresRepository) createProjectTx(
 		// Advisory lock بصيغة (int, int) — يمنع تصادم 32-bit.
 		stopLock := metrics.ObserveDBQuery("SELECT_LOCK", "projects")
 		_, errLock := tx.Exec(ctx,
-			`SELECT pg_advisory_xact_lock(hashtext('quota:projects')::int, $1::int)`,
-			ownerID,
+			`SELECT pg_advisory_xact_lock(hashtext('quota:projects')::int, hashtext($1::text)::int)`,// وبالتالي User A لا يحتاج أن ينتظر User B بسبب Quota المشاريع الخاصة بهما.
+			strconv.FormatInt(ownerID, 10),
 		)
 		stopLock(&errLock)
 		if errLock != nil {
@@ -153,7 +154,11 @@ func (r *PostgresRepository) ListProjects(
 	if !ok {
 		return nil, ErrInvalidSort
 	}
-	order := fmt.Sprintf("%s ASC, p.id ASC", orderCol)
+	orderDir := "DESC"
+	if sortBy == "name" {
+		orderDir = "ASC"
+	}
+	order := fmt.Sprintf("%s %s, p.id %s", orderCol, orderDir, orderDir)
 
 	var numUserID *int64
 	if userID != "" {
@@ -173,8 +178,7 @@ func (r *PostgresRepository) ListProjects(
 		offset = 0
 	}
 
-	query := fmt.Sprintf(listProjectsSQL, order)
-
+	query := listProjectsSQLBase + " ORDER BY " + order + " LIMIT $3 OFFSET $4"
 	stop := metrics.ObserveDBQuery("SELECT", "projects")
 	rows, err := r.pool.Query(ctx, query, search, numUserID, limit, offset)
 	stop(&err)

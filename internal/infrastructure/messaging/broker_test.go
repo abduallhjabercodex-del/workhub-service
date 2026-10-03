@@ -22,7 +22,7 @@ func testEvent(id, eventType string) domain.Event {
 	}
 }
 
-// TestBrokerPublishSubscribe يختبر آلية الاشتراك والنشر الأساسية والتحقق من استلام الأحداث عبر القناة المنشأة.
+// TestBrokerPublishSubscribe tests basic event subscription, publishing, and receipt through channels.
 func TestBrokerPublishSubscribe(t *testing.T) {
 	broker := NewBroker(3)
 	defer broker.Close()
@@ -45,7 +45,7 @@ func TestBrokerPublishSubscribe(t *testing.T) {
 	}
 }
 
-// TestBrokerConcurrentUnsubscribeDuringPublish يختبر استقرار الناقل عند إلغاء اشتراك مشتركين بشكل متزامن أثناء إرسال الأحداث للتأكد من عدم حدوث Race Condition أو Panic.
+// TestBrokerConcurrentUnsubscribeDuringPublish tests broker concurrency and stability when subscribers unsubscribe during active publishing.
 func TestBrokerConcurrentUnsubscribeDuringPublish(t *testing.T) {
 	broker := NewBroker(3)
 	defer broker.Close()
@@ -84,7 +84,7 @@ func TestBrokerConcurrentUnsubscribeDuringPublish(t *testing.T) {
 	wg.Wait()
 }
 
-// TestBrokerSlowSubscriberDoesNotBlockFastSubscriber يختبر أن المشترك البطيء (الذي تمتلئ ذاكرة التخزين المؤقت لقناته) لا يتسبب في تعطيل أو حجب المشترك السريع عن استلام أحداثه.
+// TestBrokerSlowSubscriberDoesNotBlockFastSubscriber verifies that a slow subscriber with a full channel does not block or starve fast subscribers.
 func TestBrokerSlowSubscriberDoesNotBlockFastSubscriber(t *testing.T) {
 	broker := NewBroker(1)
 	defer broker.Close()
@@ -128,7 +128,7 @@ loop:
 	}
 }
 
-// TestBrokerDeadLettersBounded يختبر حصر رسائل الخطأ في طابور الرسائل الميتة (Dead Letters Queue) بالحد الأقصى المحدد وإمكانيّة تفريغها.
+// TestBrokerDeadLettersBounded tests that dead letters are strictly capped at maxDead and can be cleared.
 func TestBrokerDeadLettersBounded(t *testing.T) {
 	const maxDead = 5
 	broker := NewBrokerWithOptions(3, maxDead)
@@ -149,7 +149,7 @@ func TestBrokerDeadLettersBounded(t *testing.T) {
 	}
 }
 
-// TestBrokerClose يختبر إغلاق ناقل الأحداث والتأكد من إغلاق كافة قنوات المشتركين ومنع نشر أي أحداث جديدة بعد الإغلاق (إرجاع ErrClosed).
+// TestBrokerClose verifies broker shutdown, subscriber channel closure, and rejection of new events with ErrClosed.
 func TestBrokerClose(t *testing.T) {
 	broker := NewBroker(3)
 

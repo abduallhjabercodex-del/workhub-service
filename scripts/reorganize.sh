@@ -5,10 +5,10 @@ cd "$(dirname "$0")/.."
 
 echo "=== WorkHub internal/ Reorganization ==="
 
-# 1. إنشاء infrastructure
+# 1. Create infrastructure directory
 mkdir -p internal/infrastructure
 
-# 2. نقل المجلدات التقنية
+# 2. Move infrastructure packages
 for dir in auth bulkhead cache circuitbreaker config featureflag \
            logger messaging metrics retry telemetry version; do
     if [ -d "internal/$dir" ]; then

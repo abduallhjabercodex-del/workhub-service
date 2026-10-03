@@ -77,8 +77,8 @@ func (r *PostgresRepository) AddProjectMemberWithQuota(
 
 	stopLock := metrics.ObserveDBQuery("SELECT_LOCK", "memberships")
 	_, errLock := tx.Exec(ctx,
-		`SELECT pg_advisory_xact_lock(hashtext('quota:members')::int, $1::int)`,
-		pID,
+		`SELECT pg_advisory_xact_lock(hashtext('quota:members')::int, hashtext($1::text)::int)`,
+		strconv.FormatInt(pID, 10),
 	)
 	stopLock(&errLock)
 	if errLock != nil {
@@ -251,8 +251,8 @@ func (r *PostgresRepository) RemoveProjectMemberSafely(
 
 	stopLock := metrics.ObserveDBQuery("SELECT_LOCK", "memberships")
 	_, errLock := tx.Exec(ctx,
-		`SELECT pg_advisory_xact_lock(hashtext('member:remove')::int, $1::int)`,
-		pID,
+		`SELECT pg_advisory_xact_lock(hashtext('member:remove')::int, hashtext($1::text)::int)`,
+		strconv.FormatInt(pID, 10),
 	)
 	stopLock(&errLock)
 	if errLock != nil {

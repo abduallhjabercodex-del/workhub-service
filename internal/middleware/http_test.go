@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// TestRequestIDIsGeneratedAndReturned يختبر إنشاء معرف فريد للطلب (X-Request-ID) وإضافته لترويسات الاستجابة وحيازة سياق الطلب عليه.
+// TestRequestIDIsGeneratedAndReturned tests generation and response header propagation of X-Request-ID.
 func TestRequestIDIsGeneratedAndReturned(t *testing.T) {
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusNoContent) })
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
@@ -20,7 +20,7 @@ func TestRequestIDIsGeneratedAndReturned(t *testing.T) {
 	}
 }
 
-// TestRecoveryReturnsServerError يختبر التعافي الآمن من حالات الـ Panic أثناء معالجة الطلبات وإرجاع رمز الاستجابة 500 دون إيقاف تشغيل الخادم.
+// TestRecoveryReturnsServerError tests graceful panic recovery returning 500 without crashing server.
 func TestRecoveryReturnsServerError(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(&strings.Builder{}, nil))
 	next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) { panic("test panic") })
@@ -32,7 +32,7 @@ func TestRecoveryReturnsServerError(t *testing.T) {
 	}
 }
 
-// TestTimeoutMiddleware يختبر إلغاء الطلبات التي تتجاوز المهلة الزمنية المحددة (Timeout) وإرجاع رمز الاستجابة 503 (Service Unavailable).
+// TestTimeoutMiddleware tests cancellation of requests exceeding configured timeout returning 503.
 func TestTimeoutMiddleware(t *testing.T) {
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(20 * time.Millisecond)

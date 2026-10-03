@@ -35,6 +35,23 @@ type Config struct {
 	TrustedProxies               []string
 	BrokerURL                    string
 	WorkerHealthPort             int
+
+	// HTTP Server Timeouts & Limits
+	ReadHeaderTimeout   time.Duration
+	ReadTimeout         time.Duration
+	WriteTimeout        time.Duration
+	IdleTimeout         time.Duration
+	MaxHeaderBytes      int
+
+	// Database Connection Pool
+	DBMaxConns          int
+	DBMinConns          int
+	DBMaxConnLifetime   time.Duration
+	DBMaxConnIdleTime   time.Duration
+	DBHealthCheckPeriod time.Duration
+
+	// Auth Rate Limit
+	AuthRateLimit       int
 }
 
 func Load() (Config, error) {
@@ -50,7 +67,7 @@ func Load() (Config, error) {
 	}
 	isProd := appEnv == "production"
 
-	// 2) Host — default 0.0.0.0 في الإنتاج
+	// 2) Host — default 0.0.0.0 in production
 	defaultHost := "0.0.0.0"
 	if !isProd {
 		defaultHost = "127.0.0.1"
@@ -66,19 +83,19 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
-	// 4) REQUEST_TIMEOUT — بين 1s و 2m
+	// 4) REQUEST_TIMEOUT — range between 1s and 2m
 	timeout, err := envDuration("REQUEST_TIMEOUT", 5*time.Second, time.Second, 2*time.Minute)
 	if err != nil {
 		return Config{}, err
 	}
 
-	// 5) DATABASE_URL — مطلوب في الإنتاج
+	// 5) DATABASE_URL — required in production
 	databaseURL := strings.TrimSpace(os.Getenv("DATABASE_URL"))
 	if isProd && databaseURL == "" {
 		return Config{}, fmt.Errorf("DATABASE_URL is required in production")
 	}
 
-	// 6) DEFAULT_OWNER_ID — ممنوع في الإنتاج
+	// 6) DEFAULT_OWNER_ID — disallowed in production
 	var ownerID int64
 	if raw := strings.TrimSpace(os.Getenv("DEFAULT_OWNER_ID")); raw != "" {
 		if isProd {
@@ -93,13 +110,13 @@ func Load() (Config, error) {
 		ownerID = 1
 	}
 
-	// 7) REDIS_URL — مطلوب في الإنتاج
+	// 7) REDIS_URL — required in production
 	redisURL := strings.TrimSpace(os.Getenv("REDIS_URL"))
 	if isProd && redisURL == "" {
 		return Config{}, fmt.Errorf("REDIS_URL is required in production")
 	}
 
-	// 8) REDIS_CACHE_TTL — بين 1s و 1h
+	// 8) REDIS_CACHE_TTL — range between 1s and 1h
 	cacheTTL, err := envDuration("REDIS_CACHE_TTL", 30*time.Second, time.Second, time.Hour)
 	if err != nil {
 		return Config{}, err
@@ -117,7 +134,7 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
-	// 9) JWT_SECRET — إلزامي في الإنتاج، طوله >= 32
+	// 9) JWT_SECRET — mandatory in production, length >= 32
 	jwtSecret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
 	defaultSecret := "workhub-dev-secret-key-32bytes-long-change-in-prod!"
 	if jwtSecret == "" {
@@ -133,19 +150,19 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("JWT_SECRET must be at least 32 bytes long")
 	}
 
-	// 10) ACCESS_TOKEN_TTL — بين 1m و 1h
+	// 10) ACCESS_TOKEN_TTL — range between 1m and 1h
 	accessTTL, err := envDuration("ACCESS_TOKEN_TTL", 15*time.Minute, time.Minute, time.Hour)
 	if err != nil {
 		return Config{}, err
 	}
 
-	// 11) REFRESH_TOKEN_TTL — بين 1h و 90d
+	// 11) REFRESH_TOKEN_TTL — range between 1h and 90d
 	refreshTTL, err := envDuration("REFRESH_TOKEN_TTL", 168*time.Hour, time.Hour, 90*24*time.Hour)
 	if err != nil {
 		return Config{}, err
 	}
 
-	// 12) BCRYPT_COST — بين 10 و 14
+	// 12) BCRYPT_COST — range between 10 and 14
 	bcryptCost, err := envInt("BCRYPT_COST", 12, 10, 14)
 	if err != nil {
 		return Config{}, err
@@ -199,13 +216,13 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
-	// 17) ALLOWED_ORIGINS — whitelist صريح
+	// 17) ALLOWED_ORIGINS — explicit whitelist
 	allowedOrigins := parseCSV(os.Getenv("ALLOWED_ORIGINS"))
 	if len(allowedOrigins) == 0 {
 		if isProd {
 			return Config{}, fmt.Errorf("ALLOWED_ORIGINS is required in production")
 		}
-		// في التطوير: اسمح بـ localhost فقط
+		// In development: allow localhost defaults
 		allowedOrigins = []string{
 			"http://localhost:3000",
 			"http://localhost:8080",
@@ -213,7 +230,7 @@ func Load() (Config, error) {
 			"http://127.0.0.1:8080",
 		}
 	}
-	// امنع "*" صراحة في الإنتاج
+	// Explicitly prohibit wildcard in production
 	for _, o := range allowedOrigins {
 		if o == "*" && isProd {
 			return Config{}, fmt.Errorf("ALLOWED_ORIGINS=* is not allowed in production")
@@ -228,6 +245,56 @@ func Load() (Config, error) {
 
 	// 20) WORKER_HEALTH_PORT — default 9091
 	workerHealthPort, err := envInt("WORKER_HEALTH_PORT", 9091, 1, 65535)
+	if err != nil {
+		return Config{}, err
+	}
+
+	// 21) HTTP Timeouts & Limits
+	readHeaderTimeout, err := envDuration("HTTP_READ_HEADER_TIMEOUT", 5*time.Second, time.Second, time.Minute)
+	if err != nil {
+		return Config{}, err
+	}
+	readTimeout, err := envDuration("HTTP_READ_TIMEOUT", 15*time.Second, time.Second, 5*time.Minute)
+	if err != nil {
+		return Config{}, err
+	}
+	writeTimeout, err := envDuration("HTTP_WRITE_TIMEOUT", 30*time.Second, time.Second, 5*time.Minute)
+	if err != nil {
+		return Config{}, err
+	}
+	idleTimeout, err := envDuration("HTTP_IDLE_TIMEOUT", 60*time.Second, time.Second, 10*time.Minute)
+	if err != nil {
+		return Config{}, err
+	}
+	maxHeaderBytes, err := envInt("HTTP_MAX_HEADER_BYTES", 1<<20, 1024, 10<<20)
+	if err != nil {
+		return Config{}, err
+	}
+
+	// 22) Database Pool Settings
+	dbMaxConns, err := envInt("DB_MAX_CONNS", 25, 1, 500)
+	if err != nil {
+		return Config{}, err
+	}
+	dbMinConns, err := envInt("DB_MIN_CONNS", 5, 0, 100)
+	if err != nil {
+		return Config{}, err
+	}
+	dbMaxConnLifetime, err := envDuration("DB_MAX_CONN_LIFETIME", time.Hour, time.Minute, 24*time.Hour)
+	if err != nil {
+		return Config{}, err
+	}
+	dbMaxConnIdleTime, err := envDuration("DB_MAX_CONN_IDLE_TIME", 30*time.Minute, time.Minute, 12*time.Hour)
+	if err != nil {
+		return Config{}, err
+	}
+	dbHealthCheckPeriod, err := envDuration("DB_HEALTH_CHECK_PERIOD", time.Minute, 5*time.Second, time.Hour)
+	if err != nil {
+		return Config{}, err
+	}
+
+	// 23) Auth Rate Limit
+	authRateLimit, err := envInt("AUTH_RATE_LIMIT", 5, 1, 1000)
 	if err != nil {
 		return Config{}, err
 	}
@@ -259,10 +326,21 @@ func Load() (Config, error) {
 		TrustedProxies:               trustedProxies,
 		BrokerURL:                    brokerURL,
 		WorkerHealthPort:             workerHealthPort,
+		ReadHeaderTimeout:            readHeaderTimeout,
+		ReadTimeout:                  readTimeout,
+		WriteTimeout:                 writeTimeout,
+		IdleTimeout:                  idleTimeout,
+		MaxHeaderBytes:               maxHeaderBytes,
+		DBMaxConns:                   dbMaxConns,
+		DBMinConns:                   dbMinConns,
+		DBMaxConnLifetime:            dbMaxConnLifetime,
+		DBMaxConnIdleTime:            dbMaxConnIdleTime,
+		DBHealthCheckPeriod:          dbHealthCheckPeriod,
+		AuthRateLimit:                authRateLimit,
 	}, nil
 }
 
-// envInt يقرأ عددًا صحيحًا مع التحقق من المدى.
+// envInt parses an environment variable as integer with range validation.
 func envInt(key string, def, min, max int) (int, error) {
 	raw := strings.TrimSpace(os.Getenv(key))
 	if raw == "" {
@@ -278,7 +356,7 @@ func envInt(key string, def, min, max int) (int, error) {
 	return parsed, nil
 }
 
-// envDuration يقرأ duration مع التحقق من المدى.
+// envDuration parses an environment variable as duration with range validation.
 func envDuration(key string, def, min, max time.Duration) (time.Duration, error) {
 	raw := strings.TrimSpace(os.Getenv(key))
 	if raw == "" {
@@ -294,7 +372,7 @@ func envDuration(key string, def, min, max time.Duration) (time.Duration, error)
 	return parsed, nil
 }
 
-// parseCSV يقسم سلسلة بفواصل، ينظف المسافات، ويحذف الفارغ.
+// parseCSV splits a comma-separated string, trims whitespace, and omits empty entries.
 func parseCSV(raw string) []string {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {

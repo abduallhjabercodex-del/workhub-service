@@ -9,7 +9,7 @@ import (
 	"workhub-service/internal/infrastructure/auth"
 )
 
-// TestAuthMiddlewareValidAndInvalidToken يختبر برمجية المصادقة الوسيطة (Auth Middleware) للتأكد من استخراج بيانات المستخدم عند تقديم رمز JWT صالح، وحظر الرموز الفاسدة أو الطلبات غير الموثقة (401 Unauthorized).
+// TestAuthMiddlewareValidAndInvalidToken verifies JWT authentication middleware extracts claims for valid tokens and blocks invalid or unauthenticated requests with 401 Unauthorized.
 func TestAuthMiddlewareValidAndInvalidToken(t *testing.T) {
 	secret := "middleware-test-secret"
 	userID := "505"

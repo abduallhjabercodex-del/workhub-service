@@ -111,25 +111,24 @@ func DoWithCallback(ctx context.Context, cfg Config, fn func(context.Context) er
 // computeDelay calculates exponential backoff with jitter.
 // Caps at MaxDelay without overflow.
 func computeDelay(cfg Config, attempt int) time.Duration {
-	d := cfg.BaseDelay // نبدأ مثلاً بـ 100 ملي ثانية
+	d := cfg.BaseDelay // Start with base delay (e.g. 100ms)
 
-	// 1. التراجع الأسي (Exponential Backoff)
+	// 1. Exponential Backoff
 	for i := 1; i < attempt; i++ {
-		d *= 2 // مضاعفة الوقت في كل محاولة (100 -> 200 -> 400)
+		d *= 2 // Double backoff on each attempt (e.g. 100ms -> 200ms -> 400ms)
 	}
-	// نقوم بوضع حد أقصى للانتظار حتى لا ننتظر لساعات
+	// Cap delay at MaxDelay ceiling
 	if d > cfg.MaxDelay {
 		d = cfg.MaxDelay
 	}
 
-	// 2. التشتت (Jitter)
+	// 2. Jitter
 	if cfg.JitterFactor > 0 {
-		// إنشاء رقم عشوائي بين -1 و +1 مضروباً في نسبة الـ Jitter (مثلاً 0.3)
-		// يعني نسبة العشوائية ستكون بين -30% إلى +30%
-		jitter := (rand.Float64()*2 - 1) * cfg.JitterFactor // 0.8 * 2 - 1 * 0.3 = 1.6 - 1 * 0.3 = 0.6 * 0.3 = 0.18
+		// Generate random float between -1 and +1 scaled by jitter factor (+/- 30%)
+		jitter := (rand.Float64()*2 - 1) * cfg.JitterFactor
 
-		// تطبيق العشوائية على وقت الانتظار
-		d = time.Duration(float64(d) * (1 + jitter)) // 100 * 1.18 = 118
+		// Apply randomized multiplier to delay
+		d = time.Duration(float64(d) * (1 + jitter))
 	}
 
 	return d

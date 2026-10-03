@@ -35,12 +35,11 @@ func (c *ProjectSummaryCache) key(projectID string) string {
 }
 
 func (c *ProjectSummaryCache) Get(ctx context.Context, projectID string) (domain.ProjectSummary, bool) {
-	if c.breaker != nil { // إذا كان القاطع مفتوحاً (Redis معطل حالياً)، الدالة Allow سترجع خطأ
-		// وسنقوم بتسجيل Debug ثم نرجع nil (عدم وجود بيانات)
-
+	if c.breaker != nil {
+		// If circuit breaker is open (Redis unavailable), Allow() returns error
 		if err := c.breaker.Allow(); err != nil {
 			c.logger.Debug("cache circuit open, skipping get", "key", c.key(projectID))
-			return domain.ProjectSummary{}, false // تخطى Redis فوراً ولا
+			return domain.ProjectSummary{}, false // Skip Redis and fail open to primary database
 		}
 	}
 
@@ -135,10 +134,10 @@ func (c *ProjectSummaryCache) Invalidate(ctx context.Context, projectID string) 
 	return nil
 }
 
-// GetOrCompute — حماية من تدافع الكاش (Cache Stampede / Thundering Herd Problem).
-// إذا انقضت صلاحية الكاش وتلقت الخدمة 100 طلب متزامن لنفس projectID،
-// فإن singleflight يضمن أن دالة computeFn تنفذ مرة واحدة فقط على مستوى قاعدة البيانات،
-// وتستفيد باقي الطلبات من نفس النتيجة مباشرة.
+// GetOrCompute prevents cache stampede (thundering herd problem).
+// When cache expires and 100 concurrent requests target the same projectID,
+// singleflight guarantees computeFn runs only once against PostgreSQL,
+// and all concurrent callers share the resulting payload.
 func (c *ProjectSummaryCache) GetOrCompute(
 	ctx context.Context,
 	projectID string,
@@ -148,7 +147,7 @@ func (c *ProjectSummaryCache) GetOrCompute(
 		return summary, nil
 	}
 
-	// حد أقصى 5 ثوان لحساب الـ summary
+	// 5-second computation timeout ceiling
 	computeCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 

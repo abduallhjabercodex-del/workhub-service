@@ -26,13 +26,13 @@ func NewPostgresRepository(pool *pgxpool.Pool) *PostgresRepository {
 	}
 
 	poolGaugeOnce.Do(func() {
-		metrics.RegisterDBPoolGauge("idle", func() float64 {
+		metrics.RegisterDBPoolGauge("idle", func() float64 { //عدد الاتصالات المتاحة
 			return float64(pool.Stat().IdleConns())
 		})
-		metrics.RegisterDBPoolGauge("acquired", func() float64 {
+		metrics.RegisterDBPoolGauge("acquired", func() float64 { //عدد الاتصالات المستخدمة
 			return float64(pool.Stat().AcquiredConns())
 		})
-		metrics.RegisterDBPoolGauge("max", func() float64 {
+		metrics.RegisterDBPoolGauge("max", func() float64 { //عدد الاتصالات المسموحة
 			return float64(pool.Stat().MaxConns())
 		})
 	})
